@@ -190,8 +190,8 @@ final class NotchController {
         notchView.nowPlaying = nowPlaying.info
         notchView.wing = wing
         let now = notchView.nowPlaying != nil
-        // Grow/shrink the collapsed notch (or the expanded card) when playback starts/stops.
-        if was != now || state == .expanded { setState(state, animated: true) } else { notchView.needsLayout = true }
+        // Grow/shrink the notch only when playback starts/stops; plain progress updates just relayout in place.
+        if was != now { setState(state, animated: true) } else { notchView.needsLayout = true }
         positionTimer?.invalidate()
         if let i = nowPlaying.info, i.isPlaying {
             positionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.notchView.tickProgress(0.5) }
@@ -522,6 +522,7 @@ final class NotchView: NSView {
 
     /// Morph the black shape from one rect to another with Core Animation; content cross-fades.
     func animateShape(from: NSRect, to: NSRect, duration: TimeInterval, completion: @escaping () -> Void) {
+        guard from != to else { shapeRect = to; completion(); return }
         let fromPath = notchPath(in: from).toCGPath()
         shapeRect = to
         content.alphaValue = 0
