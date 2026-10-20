@@ -9,6 +9,9 @@ final class ScreenshotWatcher {
     private var observers: [NSObjectProtocol] = []
     private var seen = Set<String>()
     private var started = false
+    private var dirSource: DispatchSourceFileSystemObject?
+    private var dirFD: Int32 = -1
+    private var knownFiles = Set<String>()
     private let ocrQueue = DispatchQueue(label: "ClipStack.ocr", qos: .utility)
 
     init(store: ClipStore) {
@@ -32,8 +35,58 @@ final class ScreenshotWatcher {
     private func applyEnabled() {
         if Settings.screenshotsEnabled, !started {
             started = query.start()
+            watchFolder()
         } else if !Settings.screenshotsEnabled, started {
             query.stop(); started = false
+            stopWatchingFolder()
+        }
+    }
+
+    // MARK: Folder watcher (primary — Spotlight indexing can lag or never fire)
+
+    /// Where macOS saves screenshots: `defaults read com.apple.screencapture location`, else ~/Desktop.
+    static var captureFolder: URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        if let p = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location"), !p.isEmpty {
+            let expanded = (p as NSString).expandingTildeInPath
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir), isDir.boolValue { return URL(fileURLWithPath: expanded) }
+        }
+        return home.appendingPathComponent("Desktop")
+    }
+
+    private func watchFolder() {
+        stopWatchingFolder()
+        let folder = Self.captureFolder
+        knownFiles = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+        dirFD = open(folder.path, O_EVTONLY)
+        guard dirFD >= 0 else { NSLog("ClipStack: cannot watch \(folder.path)"); return }
+        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: dirFD, eventMask: [.write, .rename], queue: .main)
+        src.setEventHandler { [weak self] in self?.folderChanged(folder) }
+        src.setCancelHandler { [fd = dirFD] in close(fd) }
+        src.resume()
+        dirSource = src
+        NSLog("ClipStack: watching screenshots in \(folder.path)")
+    }
+
+    private func stopWatchingFolder() {
+        dirSource?.cancel(); dirSource = nil; dirFD = -1
+    }
+
+    private func folderChanged(_ folder: URL) {
+        guard let now = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else { return }
+        let added = Set(now).subtracting(knownFiles)
+        knownFiles = Set(now)
+        for name in added where !name.hasPrefix(".") {
+            let ext = (name as NSString).pathExtension.lowercased()
+            guard ["png", "jpg", "jpeg", "heic", "tiff", "gif", "pdf"].contains(ext) else { continue }
+            let url = folder.appendingPathComponent(name)
+            // Only files created in the last few seconds — ignore things being moved in from elsewhere.
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+               let created = attrs[.creationDate] as? Date, Date().timeIntervalSince(created) > 10 { continue }
+            guard !seen.contains(url.path) else { continue }
+            seen.insert(url.path)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.ingest(url) }
         }
     }
 
