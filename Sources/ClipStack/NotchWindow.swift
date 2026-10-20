@@ -36,7 +36,7 @@ final class NotchController {
         notchView.onClick = { [weak self] in self?.clicked() }
         notchView.onPick = { [weak self] item in self?.pick(item) }
         notchView.onOpenHistory = { [weak self] in self?.collapse(); self?.openHistory() }
-        notchView.onDrop = { [weak self] in self?.handleDrop($0) }
+        notchView.onDrop = { [weak self] in self?.handleDrop($0) ?? false }
 
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
