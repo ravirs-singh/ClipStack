@@ -114,6 +114,7 @@ final class NowPlayingMonitor {
     }
 
     private var browserArtURL: String?
+    private var lastBrowserTitle = ""
 
     private func queryMusic() -> NowPlayingInfo? {
         let script = """
@@ -141,8 +142,11 @@ final class NowPlayingMonitor {
 
     private func queryBrowser(_ src: NowPlayingInfo.Source) -> NowPlayingInfo? {
         let js = Self.readJS.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        // Scan every media tab; prefer one that is playing, else fall back to the first paused one.
         let script = """
         tell application "\(src.rawValue)"
+            set best to ""
+            set fallback to ""
             set wi to 0
             repeat with w in windows
                 set wi to wi + 1
@@ -153,17 +157,28 @@ final class NowPlayingMonitor {
                     if u contains "music.youtube.com" or u contains "youtube.com/watch" or u contains "soundcloud.com" then
                         try
                             set r to execute t javascript "\(js)"
-                            if r is not "" and r is not missing value then return (wi as string) & "," & (ti as string) & "|" & r
+                            if r is not "" and r is not missing value then
+                                set r to (wi as string) & "," & (ti as string) & "|" & r
+                                if r contains "|playing|" then
+                                    set best to r
+                                    exit repeat
+                                else if fallback is "" then
+                                    set fallback to r
+                                end if
+                            end if
                         end try
                     end if
                 end repeat
+                if best is not "" then exit repeat
             end repeat
-            return ""
+            if best is not "" then return best
+            return fallback
         end tell
         """
         guard let out = run(script), !out.isEmpty else { return nil }
         let f = out.components(separatedBy: "|")
-        guard f.count >= 8 else { return nil }
+        guard f.count >= 8 else { NSLog("ClipStack: unexpected browser reply: \(out)"); return nil }
+        if f[2] != lastBrowserTitle { NSLog("ClipStack: now playing in \(src.rawValue): \(f[2]) — \(f[1])"); lastBrowserTitle = f[2] }
         browserTabRef = f[0]
         browserArtURL = f[4]
         return NowPlayingInfo(source: src, trackID: f[7] + "#" + f[2], title: f[2], artist: f[3], isPlaying: f[1] == "playing",
