@@ -1,7 +1,21 @@
 import AppKit
 
 struct NowPlayingInfo: Equatable {
-    enum Source: String { case spotify = "Spotify", music = "Music" }
+    enum Source: String, CaseIterable {
+        case spotify = "Spotify", music = "Music"
+        case chrome = "Google Chrome", brave = "Brave Browser", edge = "Microsoft Edge", arc = "Arc"
+        var isBrowser: Bool { self != .spotify && self != .music }
+        var bundleID: String {
+            switch self {
+            case .spotify: return "com.spotify.client"
+            case .music: return "com.apple.Music"
+            case .chrome: return "com.google.Chrome"
+            case .brave: return "com.brave.Browser"
+            case .edge: return "com.microsoft.edgemac"
+            case .arc: return "company.thebrowser.Browser"
+            }
+        }
+    }
     let source: Source
     let trackID: String
     let title: String
@@ -22,6 +36,7 @@ final class NowPlayingMonitor {
     private(set) var info: NowPlayingInfo? { didSet { if info != oldValue { NotificationCenter.default.post(name: Self.changed, object: self) } } }
 
     private var timer: Timer?
+    private var lastScriptError = ""
     private var artworkCache: (key: String, image: NSImage?)?
     private var fetchingArtwork = false
     private var observer: NSObjectProtocol?
@@ -44,6 +59,9 @@ final class NowPlayingMonitor {
         // Only talk to apps that are actually running — avoids launching them and avoids needless prompts.
         if isRunning("com.spotify.client"), let i = querySpotify() { update(i); return }
         if isRunning("com.apple.Music"), let i = queryMusic() { update(i); return }
+        for src in NowPlayingInfo.Source.allCases where src.isBrowser {
+            if isRunning(src.bundleID), let i = queryBrowser(src) { update(i); return }
+        }
         info = nil
     }
 
@@ -71,7 +89,9 @@ final class NowPlayingMonitor {
 
     private func send(_ command: String) {
         guard let src = info?.source else { return }
-        _ = run("tell application \"\(src.rawValue)\" to \(command)")
+        if src.isBrowser { sendBrowser(command, src: src) } else {
+            _ = run("tell application \"\(src.rawValue)\" to \(command)")
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.poll() }
     }
 
@@ -93,7 +113,7 @@ final class NowPlayingMonitor {
                               duration: Double(f[5].replacingOccurrences(of: ",", with: ".")) ?? 0, artwork: nil)
     }
 
-    private var spotifyArtURL: String?
+    private var browserArtURL: String?
 
     private func queryMusic() -> NowPlayingInfo? {
         let script = """
@@ -111,12 +131,70 @@ final class NowPlayingMonitor {
                               duration: Double(f[5].replacingOccurrences(of: ",", with: ".")) ?? 0, artwork: nil)
     }
 
+    // MARK: Browsers (YouTube Music, YouTube) — needs View ▸ Developer ▸ "Allow JavaScript from Apple Events" in Chrome
+
+    private var browserTabRef: String?   // "windowIndex,tabIndex" of the tab we last found
+
+    private static let readJS = """
+    (function(){var v=document.querySelector('video');var m=navigator.mediaSession&&navigator.mediaSession.metadata;if(!v||!m||!m.title)return '';var a='';if(m.artwork&&m.artwork.length){a=m.artwork[m.artwork.length-1].src;}return (v.paused?'paused':'playing')+'|'+m.title+'|'+(m.artist||'')+'|'+a+'|'+v.currentTime+'|'+(isFinite(v.duration)?v.duration:0)+'|'+location.pathname+location.search;})()
+    """
+
+    private func queryBrowser(_ src: NowPlayingInfo.Source) -> NowPlayingInfo? {
+        let js = Self.readJS.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let script = """
+        tell application "\(src.rawValue)"
+            set wi to 0
+            repeat with w in windows
+                set wi to wi + 1
+                set ti to 0
+                repeat with t in tabs of w
+                    set ti to ti + 1
+                    set u to URL of t
+                    if u contains "music.youtube.com" or u contains "youtube.com/watch" or u contains "soundcloud.com" then
+                        try
+                            set r to execute t javascript "\(js)"
+                            if r is not "" and r is not missing value then return (wi as string) & "," & (ti as string) & "|" & r
+                        end try
+                    end if
+                end repeat
+            end repeat
+            return ""
+        end tell
+        """
+        guard let out = run(script), !out.isEmpty else { return nil }
+        let f = out.components(separatedBy: "|")
+        guard f.count >= 8 else { return nil }
+        browserTabRef = f[0]
+        browserArtURL = f[4]
+        return NowPlayingInfo(source: src, trackID: f[7] + "#" + f[2], title: f[2], artist: f[3], isPlaying: f[1] == "playing",
+                              position: Double(f[5].replacingOccurrences(of: ",", with: ".")) ?? 0,
+                              duration: Double(f[6].replacingOccurrences(of: ",", with: ".")) ?? 0, artwork: nil)
+    }
+
+    private func sendBrowser(_ command: String, src: NowPlayingInfo.Source) {
+        guard let ref = browserTabRef else { return }
+        let parts = ref.components(separatedBy: ",")
+        guard parts.count == 2 else { return }
+        let js: String
+        switch command {
+        case "playpause":
+            js = "(function(){var v=document.querySelector('video');if(!v)return;v.paused?v.play():v.pause();})()"
+        case "next track":
+            js = "(function(){var b=document.querySelector('.next-button, tp-yt-paper-icon-button.next-button, .ytp-next-button, .skipControl__next');if(b)b.click();})()"
+        default:
+            js = "(function(){var b=document.querySelector('.previous-button, tp-yt-paper-icon-button.previous-button, .ytp-prev-button, .skipControl__previous');if(b)b.click();else{var v=document.querySelector('video');if(v)v.currentTime=0;}})()"
+        }
+        let esc = js.replacingOccurrences(of: "\"", with: "\\\"")
+        _ = run("tell application \"\(src.rawValue)\" to execute tab \(parts[1]) of window \(parts[0]) javascript \"\(esc)\"")
+    }
+
     private func fetchArtwork(for i: NowPlayingInfo, key: String) {
         guard !fetchingArtwork else { return }
         fetchingArtwork = true
         switch i.source {
-        case .spotify:
-            guard let urlStr = run("tell application \"Spotify\" to artwork url of current track"), let url = URL(string: urlStr) else { fetchingArtwork = false; return }
+        case .spotify, .chrome, .brave, .edge, .arc:
+            let urlStr = i.source == .spotify ? run("tell application \"Spotify\" to artwork url of current track") : browserArtURL
+            guard let urlStr, let url = URL(string: urlStr) else { storeArtwork(nil, key: key); return }
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                 let img = data.flatMap(NSImage.init(data:))
                 DispatchQueue.main.async { self?.storeArtwork(img, key: key) }
@@ -144,7 +222,11 @@ final class NowPlayingMonitor {
         var err: NSDictionary?
         guard let s = NSAppleScript(source: source) else { return nil }
         let out = s.executeAndReturnError(&err)
-        if let err { NSLog("ClipStack: AppleScript error: \(err[NSAppleScript.errorMessage] ?? "")"); return nil }
+        if let err {
+            let msg = "\(err[NSAppleScript.errorMessage] ?? "")"
+            if msg != lastScriptError { NSLog("ClipStack: AppleScript error: \(msg)"); lastScriptError = msg }
+            return nil
+        }
         return out.stringValue
     }
 }

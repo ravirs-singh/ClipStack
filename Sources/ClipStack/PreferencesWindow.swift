@@ -288,7 +288,7 @@ final class NotchPane: PreferencePane {
     private lazy var enableCheck = checkbox("Show the interactive notch", #selector(changed))
     private lazy var toastCheck = checkbox("Flash what was just copied", #selector(changed))
     private lazy var shotCheck = checkbox("Drop down with actions after a screenshot", #selector(changed))
-    private lazy var musicCheck = checkbox("Show Now Playing (Spotify, Apple Music)", #selector(changed))
+    private lazy var musicCheck = checkbox("Show Now Playing (Spotify, Apple Music, YouTube Music in Chrome)", #selector(changed))
 
     override func build() {
         row("Notch:", enableCheck)
@@ -298,7 +298,8 @@ final class NotchPane: PreferencePane {
         row(shotCheck)
         gap()
         row("Music:", musicCheck)
-        note("Album art on the left of the notch, audio bars on the right; hover for controls. macOS will ask once to allow ClipStack to control Spotify/Music.")
+        note("Album art on the left of the notch, audio bars on the right; hover for controls. macOS will ask once to allow ClipStack to control each player.")
+        note("For YouTube Music / YouTube in Chrome, Brave, Edge or Arc: enable View ▸ Developer ▸ “Allow JavaScript from Apple Events” in the browser once.")
     }
 
     override func refresh() {
