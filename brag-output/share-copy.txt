@@ -1,0 +1,3 @@
+Your Mac remembers one thing you copied. ClipStack remembers 200 — searchable, ⌘1–9 to paste — and turns the notch into something alive: album art and audio bars while music plays, your recent clips on hover, screenshots that land instantly with their text already read. Free, open source, for macOS.
+
+github.com/ravirs-singh/ClipStack
