@@ -28,6 +28,7 @@ final class NotchController {
     private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
     private let nowPlaying = NowPlayingMonitor()
     private var positionTimer: Timer?
+    private var animToken = 0
     private let shotToastSize = NSSize(width: 520, height: 96)
 
     init(store: ClipStore, monitor: ClipboardMonitor, openHistory: @escaping () -> Void) {
@@ -132,16 +133,32 @@ final class NotchController {
             }
         }()
         let target = frame(for: new)
-        if animated {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.34
-                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.3, 1.25, 0.35, 1.0)  // slight spring
-                panel.animator().setFrame(target, display: true)
-            }
-        } else {
+        guard animated, let screen, panel.isVisible else {
             panel.setFrame(target, display: true)
+            notchView.shapeRect = nil
+            return
         }
-        notchView.needsLayout = true
+        // Window frame animation is timer-driven and stutters, so: size the window to the union of old and new
+        // immediately, morph the black shape with Core Animation, then shrink the window to the final size.
+        let current = panel.frame
+        let unionSize = NSSize(width: max(current.width, target.width), height: max(current.height, target.height))
+        let union = NSRect(x: screen.frame.midX - unionSize.width / 2, y: screen.frame.maxY - unionSize.height,
+                           width: unionSize.width, height: unionSize.height)
+        let curShape = notchView.rect
+        let dx = (unionSize.width - current.width) / 2
+        let from = curShape.offsetBy(dx: dx, dy: 0)
+        let to = NSRect(x: (unionSize.width - target.width) / 2, y: 0, width: target.width, height: target.height)
+        if union != current {
+            notchView.shapeRect = from
+            panel.setFrame(union, display: false)
+        }
+        animToken += 1
+        let token = animToken
+        notchView.animateShape(from: from, to: to, duration: 0.3) { [weak self] in
+            guard let self, token == self.animToken else { return }
+            self.panel.setFrame(target, display: true)
+            self.notchView.shapeRect = nil
+        }
     }
 
     // MARK: Interactions
@@ -183,6 +200,7 @@ final class NotchController {
 
     private func collapse() {
         collapseTimer?.invalidate()
+        guard state != .collapsed else { return }
         setState(.collapsed, animated: true)
     }
 
@@ -271,6 +289,12 @@ final class NotchView: NSView {
 
     private let shape = CAShapeLayer()
     private let rim = CAShapeLayer()
+    /// Everything visible lives in `content`, which is positioned over the black shape so the window can be
+    /// larger than the shape during transitions.
+    private let content = FlippedView()
+    /// Where the black shape currently sits within bounds (nil = fills bounds).
+    var shapeRect: NSRect? { didSet { needsLayout = true } }
+    var rect: NSRect { shapeRect ?? bounds }
     private let toastIcon = NSImageView()
     private let toastLabel = NSTextField(labelWithString: "")
     private let toastStack = NSStackView()
@@ -309,6 +333,7 @@ final class NotchView: NSView {
         rim.strokeColor = NSColor.white.withAlphaComponent(0.09).cgColor
         rim.lineWidth = 1
         layer?.addSublayer(rim)
+        addSubview(content)
 
         toastIcon.contentTintColor = .white
         toastIcon.wantsLayer = true
@@ -324,7 +349,7 @@ final class NotchView: NSView {
         toastStack.addArrangedSubview(toastIcon)
         toastStack.addArrangedSubview(toastLabel)
         toastStack.isHidden = true
-        addSubview(toastStack)
+        content.addSubview(toastStack)
 
         header.textColor = NSColor.white.withAlphaComponent(0.5)
         header.font = .systemFont(ofSize: 10, weight: .semibold)
@@ -340,7 +365,7 @@ final class NotchView: NSView {
         chipsStack.orientation = .horizontal
         chipsStack.spacing = 8
         chipsStack.distribution = .fillEqually
-        [header, historyButton, chipsStack, dropHint].forEach { $0.isHidden = true; addSubview($0) }
+        [header, historyButton, chipsStack, dropHint].forEach { $0.isHidden = true; content.addSubview($0) }
 
         shotThumb.imageScaling = .scaleProportionallyUpOrDown
         shotThumb.wantsLayer = true
@@ -363,7 +388,7 @@ final class NotchView: NSView {
             b.tag = [ShotAction.copy, .text, .reveal, .trash].firstIndex(of: action)!
             shotButtons.addArrangedSubview(b)
         }
-        shotViews.forEach { $0.isHidden = true; addSubview($0) }
+        shotViews.forEach { $0.isHidden = true; content.addSubview($0) }
 
         for v in [hintArt, cardArt] {
             v.imageScaling = .scaleProportionallyUpOrDown
@@ -387,8 +412,9 @@ final class NotchView: NSView {
         cardTrack.cornerRadius = 1.5
         cardProgress.backgroundColor = NSColor.white.cgColor
         cardProgress.cornerRadius = 1.5
-        layer?.addSublayer(cardTrack)
-        layer?.addSublayer(cardProgress)
+        content.wantsLayer = true
+        content.layer?.addSublayer(cardTrack)
+        content.layer?.addSublayer(cardProgress)
         for (b, sym, cmd) in [(prevButton, "backward.fill", MusicCommand.previous), (playButton, "play.fill", .playPause), (nextButton, "forward.fill", .next)] {
             b.image = UI.symbol(sym, size: b === playButton ? 16 : 13, weight: .bold)
             b.isBordered = false
@@ -398,7 +424,7 @@ final class NotchView: NSView {
             b.action = #selector(musicButtonTapped(_:))
             b.tag = [MusicCommand.previous, .playPause, .next].firstIndex(of: cmd)!
         }
-        ([hintArt, hintBars] + musicViews).forEach { $0.isHidden = true; addSubview($0) }
+        ([hintArt, hintBars] + musicViews).forEach { $0.isHidden = true; content.addSubview($0) }
         cardTrack.isHidden = true; cardProgress.isHidden = true
 
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
@@ -413,12 +439,15 @@ final class NotchView: NSView {
 
     override func layout() {
         super.layout()
+        let r = rect
         shape.frame = bounds
-        shape.path = notchPath().toCGPath()
+        shape.path = notchPath(in: r).toCGPath()
         rim.frame = bounds
         rim.path = shape.path
         rim.isHidden = mode == .collapsed
         shape.fillColor = (dragHighlight ? NSColor(white: 0.12, alpha: 1) : .black).cgColor
+        content.frame = r
+        let cb = content.bounds   // inner layout is relative to the shape
 
         let padX: CGFloat = 16
         switch mode {
@@ -431,9 +460,9 @@ final class NotchView: NSView {
             hintArt.isHidden = !music
             hintBars.isHidden = !music
             if music {
-                let s = bounds.height - 10
+                let s = cb.height - 10
                 hintArt.frame = NSRect(x: 10, y: 5, width: s, height: s)
-                hintBars.frame = NSRect(x: bounds.width - 10 - 18, y: (bounds.height - 14) / 2, width: 18, height: 14)
+                hintBars.frame = NSRect(x: cb.width - 10 - 18, y: (cb.height - 14) / 2, width: 18, height: 14)
                 hintBars.isAnimating = nowPlaying?.isPlaying == true
             }
         case .shot:
@@ -442,19 +471,19 @@ final class NotchView: NSView {
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             shotViews.forEach { $0.isHidden = false }
             let top = baseNotchSize.height + 10
-            let thumbH = bounds.height - top - 10
+            let thumbH = cb.height - top - 10
             shotThumb.frame = NSRect(x: padX, y: top, width: thumbH * 1.5, height: thumbH)
             let tx = padX + thumbH * 1.5 + 12
-            shotTitle.frame = NSRect(x: tx, y: top, width: bounds.width - tx - padX, height: 16)
-            shotSub.frame = NSRect(x: tx, y: top + 18, width: bounds.width - tx - padX, height: 14)
-            shotButtons.frame = NSRect(x: tx, y: bounds.height - 34, width: bounds.width - tx - padX, height: 24)
+            shotTitle.frame = NSRect(x: tx, y: top, width: cb.width - tx - padX, height: 16)
+            shotSub.frame = NSRect(x: tx, y: top + 18, width: cb.width - tx - padX, height: 14)
+            shotButtons.frame = NSRect(x: tx, y: cb.height - 34, width: cb.width - tx - padX, height: 24)
         case .toast:
             shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             toastStack.isHidden = false
-            let w = bounds.width - padX * 2
-            toastStack.frame = NSRect(x: padX, y: (bounds.height - 18) / 2, width: w, height: 18)
+            let w = cb.width - padX * 2
+            toastStack.frame = NSRect(x: padX, y: (cb.height - 18) / 2, width: w, height: 18)
             toastIcon.frame.size = NSSize(width: 18, height: 18)
         case .expanded:
             toastStack.isHidden = true
@@ -469,14 +498,14 @@ final class NotchView: NSView {
                 cardArt.frame = NSRect(x: padX, y: top, width: artS, height: artS)
                 let tx = padX + artS + 12
                 let controlsW: CGFloat = 110
-                let textW = bounds.width - tx - padX - controlsW
+                let textW = cb.width - tx - padX - controlsW
                 cardTitle.frame = NSRect(x: tx, y: top + 2, width: textW, height: 17)
                 cardArtist.frame = NSRect(x: tx, y: top + 21, width: textW, height: 14)
                 cardTrack.frame = CGRect(x: tx, y: top + 44, width: textW, height: 3)
                 layoutProgress()
                 cardTime.sizeToFit()
                 cardTime.frame.origin = NSPoint(x: tx, y: top + 50)
-                let cx = bounds.width - padX - controlsW
+                let cx = cb.width - padX - controlsW
                 prevButton.frame = NSRect(x: cx, y: top + 14, width: 30, height: 28)
                 playButton.frame = NSRect(x: cx + 38, y: top + 12, width: 34, height: 32)
                 nextButton.frame = NSRect(x: cx + 80, y: top + 14, width: 30, height: 28)
@@ -484,11 +513,37 @@ final class NotchView: NSView {
             }
             header.frame = NSRect(x: padX, y: top, width: 200, height: 16)
             historyButton.sizeToFit()
-            historyButton.frame.origin = NSPoint(x: bounds.width - padX - historyButton.frame.width, y: top - 3)
-            chipsStack.frame = NSRect(x: padX, y: top + 24, width: bounds.width - padX * 2, height: 72)
+            historyButton.frame.origin = NSPoint(x: cb.width - padX - historyButton.frame.width, y: top - 3)
+            chipsStack.frame = NSRect(x: padX, y: top + 24, width: cb.width - padX * 2, height: 72)
             dropHint.sizeToFit()
-            dropHint.frame.origin = NSPoint(x: (bounds.width - dropHint.frame.width) / 2, y: bounds.height - 22)
+            dropHint.frame.origin = NSPoint(x: (cb.width - dropHint.frame.width) / 2, y: cb.height - 22)
         }
+    }
+
+    /// Morph the black shape from one rect to another with Core Animation; content cross-fades.
+    func animateShape(from: NSRect, to: NSRect, duration: TimeInterval, completion: @escaping () -> Void) {
+        let fromPath = notchPath(in: from).toCGPath()
+        shapeRect = to
+        content.alphaValue = 0
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        layoutSubtreeIfNeeded()
+        CATransaction.commit()
+
+        let morph = CABasicAnimation(keyPath: "path")
+        morph.fromValue = fromPath
+        morph.toValue = shape.path
+        morph.duration = duration
+        morph.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1.0)
+        shape.add(morph, forKey: "morph")
+        rim.add(morph, forKey: "morph")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration * 0.45) { [weak self] in
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = duration * 0.5
+                self?.content.animator().alphaValue = 1
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: completion)
     }
 
     private func setMusicCardVisible(_ v: Bool) {
@@ -535,10 +590,9 @@ final class NotchView: NSView {
     }
 
     /// Flat top (hugs the screen edge), rounded bottom corners, small concave "ears" at the top like the real notch.
-    private func notchPath() -> NSBezierPath {
+    private func notchPath(in b: NSRect) -> NSBezierPath {
         let r: CGFloat = mode == .collapsed ? (hasRealNotch ? 10 : 12) : 22
         let ear: CGFloat = hasRealNotch ? 6 : 0
-        let b = bounds
         let p = NSBezierPath()
         p.move(to: NSPoint(x: b.minX, y: b.minY))
         // top-left ear curving down into the body
@@ -598,12 +652,13 @@ final class NotchView: NSView {
     override func mouseExited(with event: NSEvent) { onExit?() }
     override func mouseUp(with event: NSEvent) {
         // Only treat clicks on the black shape itself (not chips/buttons) as a toggle.
-        if hitTest(convert(event.locationInWindow, from: nil)) === self { onClick?() }
+        let hit = hitTest(convert(event.locationInWindow, from: nil))
+        if hit === self || hit === content { onClick?() }
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         // Ignore clicks outside the black shape so transparent corners don't eat events.
-        guard notchPath().contains(point) else { return nil }
+        guard notchPath(in: rect).contains(point) else { return nil }
         return super.hitTest(point)
     }
 
@@ -621,6 +676,9 @@ final class NotchView: NSView {
         return onDrop?(sender.draggingPasteboard) ?? false
     }
 }
+
+/// Plain container with top-left origin, matching NotchView.
+final class FlippedView: NSView { override var isFlipped: Bool { true } }
 
 // MARK: - Chip
 
