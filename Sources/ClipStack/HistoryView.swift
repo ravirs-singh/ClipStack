@@ -395,25 +395,34 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         footer.setCustomSpacing(8, after: countLabel)
 
         let hSep = NSBox(); hSep.boxType = .separator
-        let root = NSStackView(views: [columns, hSep, footer])
-        root.orientation = .vertical
-        root.spacing = 0
-        root.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(root)
+        // Explicit vertical layout: content area fills everything above the footer.
+        [columns, hSep, footer].forEach { $0.translatesAutoresizingMaskIntoConstraints = false; view.addSubview($0) }
         view.addSubview(emptyStack)
+        columns.distribution = .fill
+        left.distribution = .fill
+        right.distribution = .fill
 
         NSLayoutConstraint.activate([
             view.widthAnchor.constraint(equalToConstant: Self.size.width),
             view.heightAnchor.constraint(equalToConstant: Self.size.height),
-            root.topAnchor.constraint(equalTo: view.topAnchor),
-            root.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            columns.widthAnchor.constraint(equalTo: root.widthAnchor),
-            footer.widthAnchor.constraint(equalTo: root.widthAnchor),
-            sidebar.heightAnchor.constraint(equalTo: columns.heightAnchor),
-            right.heightAnchor.constraint(equalTo: columns.heightAnchor),
-            vSep.heightAnchor.constraint(equalTo: columns.heightAnchor),
+            columns.topAnchor.constraint(equalTo: view.topAnchor),
+            columns.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            columns.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            columns.bottomAnchor.constraint(equalTo: hSep.topAnchor),
+            hSep.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hSep.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hSep.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            footer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            footer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            footer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            footer.heightAnchor.constraint(equalToConstant: 38),
+            sidebar.topAnchor.constraint(equalTo: columns.topAnchor),
+            sidebar.bottomAnchor.constraint(equalTo: columns.bottomAnchor),
+            right.topAnchor.constraint(equalTo: columns.topAnchor),
+            right.bottomAnchor.constraint(equalTo: columns.bottomAnchor),
+            vSep.topAnchor.constraint(equalTo: columns.topAnchor),
+            vSep.bottomAnchor.constraint(equalTo: columns.bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: left.bottomAnchor),
             emptyStack.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
             emptyStack.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
         ])

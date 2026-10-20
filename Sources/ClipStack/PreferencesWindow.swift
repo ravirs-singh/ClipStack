@@ -53,8 +53,6 @@ class PreferencePane: NSViewController {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 560, height: 380))
         grid.rowSpacing = 10
         grid.columnSpacing = 14
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 150
         grid.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(grid)
         NSLayoutConstraint.activate([
@@ -64,6 +62,10 @@ class PreferencePane: NSViewController {
             grid.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -24),
         ])
         build()
+        if grid.numberOfColumns > 0 {
+            grid.column(at: 0).xPlacement = .trailing
+            grid.column(at: 0).width = 150
+        }
         observer = NotificationCenter.default.addObserver(forName: Settings.changed, object: nil, queue: .main) { [weak self] _ in self?.refresh() }
         refresh()
     }
