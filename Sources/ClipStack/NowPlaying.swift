@@ -36,6 +36,8 @@ final class NowPlayingMonitor {
     private(set) var info: NowPlayingInfo? { didSet { if info != oldValue { NotificationCenter.default.post(name: Self.changed, object: self) } } }
 
     private var timer: Timer?
+    private let queue = DispatchQueue(label: "ClipStack.nowplaying", qos: .utility)
+    private var polling = false
     private var lastScriptError = ""
     private var lastScriptErrorAt = Date.distantPast
     private var artworkCache: (key: String, image: NSImage?)?
@@ -57,13 +59,26 @@ final class NowPlayingMonitor {
 
     /// Poll interval is 1 s; position is interpolated by callers between polls.
     private func poll() {
+        guard !polling else { return }
+        polling = true
         // Only talk to apps that are actually running — avoids launching them and avoids needless prompts.
-        if isRunning("com.spotify.client"), let i = querySpotify() { update(i); return }
-        if isRunning("com.apple.Music"), let i = queryMusic() { update(i); return }
-        for src in NowPlayingInfo.Source.allCases where src.isBrowser {
-            if isRunning(src.bundleID), let i = queryBrowser(src) { update(i); return }
+        let running = NowPlayingInfo.Source.allCases.filter { isRunning($0.bundleID) }
+        queue.async { [weak self] in
+            guard let self else { return }
+            var found: NowPlayingInfo?
+            for src in running {
+                switch src {
+                case .spotify: found = self.querySpotify()
+                case .music: found = self.queryMusic()
+                default: found = self.queryBrowser(src)
+                }
+                if found != nil { break }
+            }
+            DispatchQueue.main.async {
+                self.polling = false
+                if let found { self.update(found) } else { self.info = nil }
+            }
         }
-        info = nil
     }
 
     private func update(_ fresh: NowPlayingInfo) {
@@ -90,10 +105,13 @@ final class NowPlayingMonitor {
 
     private func send(_ command: String) {
         guard let src = info?.source else { return }
-        if src.isBrowser { sendBrowser(command, src: src) } else {
-            _ = run("tell application \"\(src.rawValue)\" to \(command)")
+        queue.async { [weak self] in
+            guard let self else { return }
+            if src.isBrowser { self.sendBrowser(command, src: src) } else {
+                _ = self.run("tell application \"\(src.rawValue)\" to \(command)")
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.poll() }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.poll() }
     }
 
     // MARK: Queries
@@ -207,20 +225,31 @@ final class NowPlayingMonitor {
     private func fetchArtwork(for i: NowPlayingInfo, key: String) {
         guard !fetchingArtwork else { return }
         fetchingArtwork = true
-        switch i.source {
-        case .spotify, .chrome, .brave, .edge, .arc:
-            let urlStr = i.source == .spotify ? run("tell application \"Spotify\" to artwork url of current track") : browserArtURL
-            guard let urlStr, let url = URL(string: urlStr) else { storeArtwork(nil, key: key); return }
-            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-                let img = data.flatMap(NSImage.init(data:))
-                DispatchQueue.main.async { self?.storeArtwork(img, key: key) }
-            }.resume()
-        case .music:
-            // Artwork comes back as raw image data in the descriptor.
-            let script = "tell application \"Music\" to get data of artwork 1 of current track"
-            var err: NSDictionary?
-            let desc = NSAppleScript(source: script)?.executeAndReturnError(&err)
-            storeArtwork(desc.flatMap { NSImage(data: $0.data) }, key: key)
+        let browserArt = browserArtURL
+        queue.async { [weak self] in
+            guard let self else { return }
+            switch i.source {
+            case .spotify, .chrome, .brave, .edge, .arc:
+                let urlStr = i.source == .spotify ? self.run("tell application \"Spotify\" to artwork url of current track") : browserArt
+                guard let urlStr, let url = URL(string: urlStr) else { DispatchQueue.main.async { self.storeArtwork(nil, key: key) }; return }
+                URLSession.shared.dataTask(with: url) { data, _, _ in
+                    let img = data.flatMap(NSImage.init(data:))
+                    DispatchQueue.main.async { self.storeArtwork(img, key: key) }
+                }.resume()
+            case .music:
+                // osascript can't return binary, so have Music write the artwork to a temp file.
+                let tmp = NSTemporaryDirectory() + "clipstack-art-\(UUID().uuidString)"
+                let script = """
+                tell application "Music" to set d to data of artwork 1 of current track
+                set f to open for access POSIX file "\(tmp)" with write permission
+                write d to f
+                close access f
+                """
+                _ = self.run(script)
+                let img = NSImage(contentsOfFile: tmp)
+                try? FileManager.default.removeItem(atPath: tmp)
+                DispatchQueue.main.async { self.storeArtwork(img, key: key) }
+            }
         }
     }
 
@@ -234,18 +263,28 @@ final class NowPlayingMonitor {
         }
     }
 
+    /// Runs AppleScript in a child `osascript` process. Blocking — call only on `queue`. Unlike NSAppleScript on
+    /// the main thread this never spins a nested event loop, so the UI can't re-enter mid-query.
     private func run(_ source: String) -> String? {
-        var err: NSDictionary?
-        guard let s = NSAppleScript(source: source) else { return nil }
-        let out = s.executeAndReturnError(&err)
-        if let err {
-            let msg = "\(err[NSAppleScript.errorMessage] ?? "") (\(err[NSAppleScript.errorNumber] ?? ""))"
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        p.arguments = ["-"]
+        let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
+        p.standardInput = inPipe; p.standardOutput = outPipe; p.standardError = errPipe
+        do { try p.run() } catch { return nil }
+        inPipe.fileHandleForWriting.write(source.data(using: .utf8)!)
+        inPipe.fileHandleForWriting.closeFile()
+        let out = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let err = errPipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        if p.terminationStatus != 0 {
+            let msg = String(data: err, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "osascript failed"
             if msg != lastScriptError || Date().timeIntervalSince(lastScriptErrorAt) > 20 {
                 NSLog("ClipStack: AppleScript error: \(msg)"); lastScriptError = msg; lastScriptErrorAt = Date()
             }
             return nil
         }
-        return out.stringValue
+        return String(data: out, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
