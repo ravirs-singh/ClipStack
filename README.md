@@ -20,6 +20,8 @@ A lightweight menu-bar clipboard history app written in Swift (pure AppKit — b
 - **Instant capture shortcuts** (⌃⇧3 / ⌃⇧4 / ⌃⇧5 by default, rebindable): ClipStack runs the capture itself, so the file
   and history entry appear immediately — no floating-thumbnail delay. Also in the menu-bar right-click menu.
 - Filter bar: All / Text / Images / Screenshots / Files
+- **Now Playing in the notch**: album art on the left, animated audio bars on the right while Spotify / Apple Music plays;
+  hover for a player card with progress and prev / play / next.
 - **Interactive notch** (Dynamic-Island style): sits over the MacBook notch, flashes what you just copied, expands on hover
   to show your last 6 clips as tappable chips (tap = paste), click to open full history, and accepts drag-and-drop of
   files/text/images straight into the clipboard. Macs without a notch get a small pill at the top of the screen.
@@ -54,5 +56,6 @@ For development: `swift run` (menu-bar icon appears; "Launch at login" is only a
 | `PreferencesWindow.swift` | Preferences window + hotkey recorder |
 | `HistoryView.swift` | Popover UI: list, preview pane, actions, quick-pick |
 | `ScreenshotWatcher.swift` | Spotlight watcher, organize/rename, Vision OCR |
+| `NowPlaying.swift` | Spotify / Music polling via Apple Events, audio-bars view |
 | `NotchWindow.swift` | Notch panel: shape, toast, hover-expand chips, drag & drop |
 | `AppDelegate.swift` | Status item, popover, wiring |

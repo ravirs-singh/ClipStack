@@ -46,6 +46,12 @@ enum Settings {
         set { d.set(newValue, forKey: "notchScreenshotToast"); notify() }
     }
 
+    /// Show album art + audio bars in the notch while music plays (Spotify / Apple Music).
+    static var notchNowPlaying: Bool {
+        get { d.object(forKey: "notchNowPlaying") as? Bool ?? true }
+        set { d.set(newValue, forKey: "notchNowPlaying"); notify() }
+    }
+
     // MARK: Screenshots
 
     static var screenshotsEnabled: Bool {

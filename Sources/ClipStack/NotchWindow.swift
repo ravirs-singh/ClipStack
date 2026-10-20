@@ -24,6 +24,10 @@ final class NotchController {
     private var observers: [NSObjectProtocol] = []
 
     private let expandedSize = NSSize(width: 560, height: 190)
+    private let musicExtra: CGFloat = 84          // extra height for the player card when music is playing
+    private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
+    private let nowPlaying = NowPlayingMonitor()
+    private var positionTimer: Timer?
     private let shotToastSize = NSSize(width: 520, height: 96)
 
     init(store: ClipStore, monitor: ClipboardMonitor, openHistory: @escaping () -> Void) {
@@ -39,6 +43,9 @@ final class NotchController {
         notchView.onOpenHistory = { [weak self] in self?.collapse(); self?.openHistory() }
         notchView.onDrop = { [weak self] in self?.handleDrop($0) ?? false }
         notchView.onShotAction = { [weak self] action, item in self?.shotAction(action, item) }
+        notchView.onMusic = { [weak self] cmd in
+            switch cmd { case .playPause: self?.nowPlaying.playPause(); case .next: self?.nowPlaying.next(); case .previous: self?.nowPlaying.previous() }
+        }
 
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
@@ -62,6 +69,9 @@ final class NotchController {
         })
         observers.append(NotificationCenter.default.addObserver(forName: Settings.changed, object: nil, queue: .main) { [weak self] _ in
             self?.applyEnabled()
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NowPlayingMonitor.changed, object: nil, queue: .main) { [weak self] _ in
+            self?.nowPlayingChanged()
         })
 
         applyEnabled()
@@ -99,10 +109,12 @@ final class NotchController {
         guard let screen else { return .zero }
         let size: NSSize
         switch state {
-        case .collapsed: size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0), height: notchSize.height)
+        case .collapsed:
+            let wings = notchView.nowPlaying != nil ? wing * 2 : 0
+            size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0) + wings, height: notchSize.height)
         case .toast:     size = NSSize(width: max(notchSize.width + 240, 380), height: notchSize.height + 14)
         case .shot:      size = NSSize(width: max(shotToastSize.width, notchSize.width + 200), height: notchSize.height + shotToastSize.height)
-        case .expanded:  size = expandedSize
+        case .expanded:  size = NSSize(width: expandedSize.width, height: expandedSize.height + (notchView.nowPlaying != nil ? musicExtra : 0))
         }
         let x = screen.frame.midX - size.width / 2
         let y = screen.frame.maxY - size.height
@@ -152,6 +164,21 @@ final class NotchController {
     private func expand() {
         notchView.items = Array(store.filtered("").prefix(6))
         setState(.expanded, animated: true)
+    }
+
+    // MARK: Now playing
+
+    private func nowPlayingChanged() {
+        let was = notchView.nowPlaying != nil
+        notchView.nowPlaying = nowPlaying.info
+        notchView.wing = wing
+        let now = notchView.nowPlaying != nil
+        // Grow/shrink the collapsed notch (or the expanded card) when playback starts/stops.
+        if was != now || state == .expanded { setState(state, animated: true) } else { notchView.needsLayout = true }
+        positionTimer?.invalidate()
+        if let i = nowPlaying.info, i.isPlaying {
+            positionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.notchView.tickProgress(0.5) }
+        }
     }
 
     private func collapse() {
@@ -223,6 +250,10 @@ final class NotchController {
 final class NotchView: NSView {
     enum Mode { case collapsed, toast, shot, expanded }
     enum ShotAction { case copy, text, reveal, trash }
+    enum MusicCommand { case playPause, next, previous }
+    var onMusic: ((MusicCommand) -> Void)?
+    var nowPlaying: NowPlayingInfo? { didSet { updateMusic() } }
+    var wing: CGFloat = 44
     var onShotAction: ((ShotAction, ClipItem) -> Void)?
 
     var mode: Mode = .collapsed { didSet { needsLayout = true; needsDisplay = true } }
@@ -253,6 +284,21 @@ final class NotchView: NSView {
     private let shotSub = NSTextField(labelWithString: "")
     private let shotButtons = NSStackView()
     private var shotViews: [NSView] { [shotThumb, shotTitle, shotSub, shotButtons] }
+
+    // Now playing: collapsed hint (art + bars in the wings) and expanded player card
+    private let hintArt = NSImageView()
+    private let hintBars = AudioBarsView()
+    private let cardArt = NSImageView()
+    private let cardTitle = NSTextField(labelWithString: "")
+    private let cardArtist = NSTextField(labelWithString: "")
+    private let cardProgress = CALayer()
+    private let cardTrack = CALayer()
+    private let cardTime = NSTextField(labelWithString: "")
+    private let prevButton = NSButton()
+    private let playButton = NSButton()
+    private let nextButton = NSButton()
+    private var progressPosition: TimeInterval = 0
+    private var musicViews: [NSView] { [cardArt, cardTitle, cardArtist, cardTime, prevButton, playButton, nextButton] }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -319,6 +365,42 @@ final class NotchView: NSView {
         }
         shotViews.forEach { $0.isHidden = true; addSubview($0) }
 
+        for v in [hintArt, cardArt] {
+            v.imageScaling = .scaleProportionallyUpOrDown
+            v.wantsLayer = true
+            v.layer?.cornerRadius = 6
+            v.layer?.cornerCurve = .continuous
+            v.layer?.masksToBounds = true
+            v.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.12).cgColor
+        }
+        cardArt.layer?.cornerRadius = 10
+        hintBars.color = NSColor(red: 0.98, green: 0.35, blue: 0.45, alpha: 1)
+        cardTitle.textColor = .white
+        cardTitle.font = .systemFont(ofSize: 13, weight: .semibold)
+        cardTitle.lineBreakMode = .byTruncatingTail
+        cardArtist.textColor = NSColor.white.withAlphaComponent(0.6)
+        cardArtist.font = .systemFont(ofSize: 11)
+        cardArtist.lineBreakMode = .byTruncatingTail
+        cardTime.textColor = NSColor.white.withAlphaComponent(0.45)
+        cardTime.font = .monospacedDigitSystemFont(ofSize: 9, weight: .regular)
+        cardTrack.backgroundColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        cardTrack.cornerRadius = 1.5
+        cardProgress.backgroundColor = NSColor.white.cgColor
+        cardProgress.cornerRadius = 1.5
+        layer?.addSublayer(cardTrack)
+        layer?.addSublayer(cardProgress)
+        for (b, sym, cmd) in [(prevButton, "backward.fill", MusicCommand.previous), (playButton, "play.fill", .playPause), (nextButton, "forward.fill", .next)] {
+            b.image = UI.symbol(sym, size: b === playButton ? 16 : 13, weight: .bold)
+            b.isBordered = false
+            b.imagePosition = .imageOnly
+            b.contentTintColor = .white
+            b.target = self
+            b.action = #selector(musicButtonTapped(_:))
+            b.tag = [MusicCommand.previous, .playPause, .next].firstIndex(of: cmd)!
+        }
+        ([hintArt, hintBars] + musicViews).forEach { $0.isHidden = true; addSubview($0) }
+        cardTrack.isHidden = true; cardProgress.isHidden = true
+
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
         registerForDraggedTypes([.fileURL, .string, .tiff, .png])
     }
@@ -344,9 +426,20 @@ final class NotchView: NSView {
             toastStack.isHidden = true
             shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
+            setMusicCardVisible(false)
+            let music = nowPlaying != nil
+            hintArt.isHidden = !music
+            hintBars.isHidden = !music
+            if music {
+                let s = bounds.height - 10
+                hintArt.frame = NSRect(x: 10, y: 5, width: s, height: s)
+                hintBars.frame = NSRect(x: bounds.width - 10 - 18, y: (bounds.height - 14) / 2, width: 18, height: 14)
+                hintBars.isAnimating = nowPlaying?.isPlaying == true
+            }
         case .shot:
             toastStack.isHidden = true
             setExpandedVisible(false)
+            hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             shotViews.forEach { $0.isHidden = false }
             let top = baseNotchSize.height + 10
             let thumbH = bounds.height - top - 10
@@ -358,6 +451,7 @@ final class NotchView: NSView {
         case .toast:
             shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
+            hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             toastStack.isHidden = false
             let w = bounds.width - padX * 2
             toastStack.frame = NSRect(x: padX, y: (bounds.height - 18) / 2, width: w, height: 18)
@@ -365,8 +459,29 @@ final class NotchView: NSView {
         case .expanded:
             toastStack.isHidden = true
             shotViews.forEach { $0.isHidden = true }
+            hintArt.isHidden = true; hintBars.isHidden = true
             setExpandedVisible(true)
-            let top = baseNotchSize.height + 8
+            var top = baseNotchSize.height + 8
+            let music = nowPlaying != nil
+            setMusicCardVisible(music)
+            if music {
+                let artS: CGFloat = 56
+                cardArt.frame = NSRect(x: padX, y: top, width: artS, height: artS)
+                let tx = padX + artS + 12
+                let controlsW: CGFloat = 110
+                let textW = bounds.width - tx - padX - controlsW
+                cardTitle.frame = NSRect(x: tx, y: top + 2, width: textW, height: 17)
+                cardArtist.frame = NSRect(x: tx, y: top + 21, width: textW, height: 14)
+                cardTrack.frame = CGRect(x: tx, y: top + 44, width: textW, height: 3)
+                layoutProgress()
+                cardTime.sizeToFit()
+                cardTime.frame.origin = NSPoint(x: tx, y: top + 50)
+                let cx = bounds.width - padX - controlsW
+                prevButton.frame = NSRect(x: cx, y: top + 14, width: 30, height: 28)
+                playButton.frame = NSRect(x: cx + 38, y: top + 12, width: 34, height: 32)
+                nextButton.frame = NSRect(x: cx + 80, y: top + 14, width: 30, height: 28)
+                top += artS + 28
+            }
             header.frame = NSRect(x: padX, y: top, width: 200, height: 16)
             historyButton.sizeToFit()
             historyButton.frame.origin = NSPoint(x: bounds.width - padX - historyButton.frame.width, y: top - 3)
@@ -374,6 +489,42 @@ final class NotchView: NSView {
             dropHint.sizeToFit()
             dropHint.frame.origin = NSPoint(x: (bounds.width - dropHint.frame.width) / 2, y: bounds.height - 22)
         }
+    }
+
+    private func setMusicCardVisible(_ v: Bool) {
+        musicViews.forEach { $0.isHidden = !v }
+        cardTrack.isHidden = !v; cardProgress.isHidden = !v
+    }
+
+    private func layoutProgress() {
+        guard let i = nowPlaying, i.duration > 0 else { cardProgress.frame = .zero; return }
+        let frac = CGFloat(min(1, max(0, progressPosition / i.duration)))
+        cardProgress.frame = CGRect(x: cardTrack.frame.minX, y: cardTrack.frame.minY, width: cardTrack.frame.width * frac, height: cardTrack.frame.height)
+        let fmt: (TimeInterval) -> String = { t in String(format: "%d:%02d", Int(t) / 60, Int(t) % 60) }
+        cardTime.stringValue = "\(fmt(progressPosition)) / \(fmt(i.duration))"
+    }
+
+    private func updateMusic() {
+        guard let i = nowPlaying else { needsLayout = true; return }
+        progressPosition = i.position
+        hintArt.image = i.artwork
+        cardArt.image = i.artwork
+        cardTitle.stringValue = i.title
+        cardArtist.stringValue = i.artist
+        playButton.image = UI.symbol(i.isPlaying ? "pause.fill" : "play.fill", size: 16, weight: .bold)
+        hintBars.isAnimating = i.isPlaying
+        needsLayout = true
+    }
+
+    /// Advance the progress bar between polls.
+    func tickProgress(_ dt: TimeInterval) {
+        guard let i = nowPlaying, i.isPlaying else { return }
+        progressPosition = min(i.duration, progressPosition + dt)
+        if mode == .expanded { CATransaction.begin(); CATransaction.setDisableActions(true); layoutProgress(); CATransaction.commit() }
+    }
+
+    @objc private func musicButtonTapped(_ sender: NSButton) {
+        onMusic?([MusicCommand.previous, .playPause, .next][sender.tag])
     }
 
     private func setExpandedVisible(_ v: Bool) {
