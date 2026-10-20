@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)   // menu-bar only, no Dock icon
+        quitOtherInstances()
 
         monitor = ClipboardMonitor(store: store)
         monitor.start()
@@ -32,6 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notch = NotchController(store: store, monitor: monitor, openHistory: { [weak self] in self?.showPopover() })
     }
 
+    /// A freshly launched build replaces any ClipStack already running (handy after rebuilds).
+    private func quitOtherInstances() {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+        where app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            app.terminate()
+        }
+    }
+
     @objc private func statusClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             showStatusMenu()
@@ -44,9 +54,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Show History  \(Settings.hotKeyDescription)", action: #selector(togglePopover), keyEquivalent: "")
         menu.addItem(withTitle: "Preferences…", action: #selector(openPreferences), keyEquivalent: ",")
+        menu.items.forEach { $0.target = self }
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit ClipStack", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        menu.items.forEach { if $0.target == nil { $0.target = self } }
+        let quit = NSMenuItem(title: "Quit ClipStack", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        menu.addItem(quit)
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil   // so left-click goes back to the popover
