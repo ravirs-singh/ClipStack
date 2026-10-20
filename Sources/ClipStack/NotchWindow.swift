@@ -23,7 +23,7 @@ final class NotchController {
     private var hovering = false
     private var observers: [NSObjectProtocol] = []
 
-    private let expandedSize = NSSize(width: 560, height: 190)
+    private let expandedSize = NSSize(width: 560, height: 170)
     private let musicExtra: CGFloat = 84          // extra height for the player card when music is playing
     private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
     private let nowPlaying = NowPlayingMonitor()
@@ -703,11 +703,14 @@ final class ChipView: NSView, NSDraggingSource {
         let icon = NSImageView()
         icon.contentTintColor = .white
         icon.imageScaling = .scaleProportionallyUpOrDown
-        if item.kind == .image, let img = item.image {
+        let isThumb = item.kind == .image && item.image != nil
+        if isThumb, let img = item.image {
             icon.image = img
             icon.contentTintColor = nil
+            icon.imageScaling = .scaleAxesIndependently
             icon.wantsLayer = true
-            icon.layer?.cornerRadius = 4
+            icon.layer?.cornerRadius = 5
+            icon.layer?.cornerCurve = .continuous
             icon.layer?.masksToBounds = true
         } else if type == .color, let c = SmartType.parseColor(item.text ?? ""), let c {
             icon.wantsLayer = true
@@ -720,7 +723,7 @@ final class ChipView: NSView, NSDraggingSource {
         let label = NSTextField(wrappingLabelWithString: item.preview)
         label.textColor = .white
         label.font = .systemFont(ofSize: 11)
-        label.maximumNumberOfLines = 2
+        label.maximumNumberOfLines = isThumb ? 1 : 2
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -740,8 +743,8 @@ final class ChipView: NSView, NSDraggingSource {
             v.bottomAnchor.constraint(equalTo: bottomAnchor),
             v.leadingAnchor.constraint(equalTo: leadingAnchor),
             v.trailingAnchor.constraint(equalTo: trailingAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 18),
-            icon.heightAnchor.constraint(equalToConstant: 18),
+            icon.widthAnchor.constraint(equalToConstant: isThumb ? 48 : 18),
+            icon.heightAnchor.constraint(equalToConstant: isThumb ? 30 : 18),
             label.widthAnchor.constraint(equalTo: v.widthAnchor, constant: -16),
         ])
         toolTip = item.text.map { String($0.prefix(400)) }
