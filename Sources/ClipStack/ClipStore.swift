@@ -75,6 +75,49 @@ final class ClipStore {
         trim(); save(); announce(items[0])
     }
 
+    /// Records a screenshot file: stores a downscaled thumbnail, keeps a reference to the original.
+    @discardableResult
+    func addScreenshot(at url: URL, appName: String?) -> ClipItem? {
+        guard let img = NSImage(contentsOf: url) else { return nil }
+        let thumb = Self.downscale(img, maxSide: 1000)
+        guard let tiff = thumb.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let path = imagesDir.appendingPathComponent(UUID().uuidString + ".png")
+        do { try png.write(to: path) } catch { return nil }
+        var item = ClipItem(imagePath: path.path)
+        item.sourcePath = url.path
+        item.appName = appName
+        items.insert(item, at: 0)
+        trim(); save(); announce(items[0])
+        return item
+    }
+
+    func setOCRText(_ text: String, for item: ClipItem) {
+        guard let idx = items.firstIndex(of: item) else { return }
+        items[idx].ocrText = text
+        save()
+    }
+
+    /// Moves a screenshot's original file to the Trash and removes the entry.
+    func trashScreenshot(_ item: ClipItem) {
+        if let url = item.sourceURL { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+        remove(item)
+    }
+
+    private static func downscale(_ img: NSImage, maxSide: CGFloat) -> NSImage {
+        guard let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return img }
+        let w = CGFloat(cg.width), h = CGFloat(cg.height)
+        let scale = min(1, maxSide / max(w, h))
+        guard scale < 1 else { return img }
+        let size = NSSize(width: w * scale, height: h * scale)
+        let out = NSImage(size: size)
+        out.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        img.draw(in: NSRect(origin: .zero, size: size))
+        out.unlockFocus()
+        return out
+    }
+
     func togglePin(_ item: ClipItem) {
         guard let idx = items.firstIndex(of: item) else { return }
         items[idx].pinned.toggle()
@@ -96,15 +139,35 @@ final class ClipStore {
 
     // MARK: Queries
 
-    func filtered(_ query: String) -> [ClipItem] {
-        let sorted = items.sorted { a, b in
+    enum Filter: Int, CaseIterable {
+        case all, text, images, screenshots, files
+        var title: String {
+            switch self {
+            case .all: return "All"; case .text: return "Text"; case .images: return "Images"
+            case .screenshots: return "Screenshots"; case .files: return "Files"
+            }
+        }
+        func matches(_ i: ClipItem) -> Bool {
+            switch self {
+            case .all: return true
+            case .text: return i.kind == .text
+            case .images: return i.kind == .image && !i.isScreenshot
+            case .screenshots: return i.isScreenshot
+            case .files: return i.kind == .files
+            }
+        }
+    }
+
+    func filtered(_ query: String, filter: Filter = .all) -> [ClipItem] {
+        let sorted = items.filter(filter.matches).sorted { a, b in
             if a.pinned != b.pinned { return a.pinned }
             return a.createdAt > b.createdAt
         }
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return sorted }
         return sorted.filter { item in
-            (item.text ?? "").localizedCaseInsensitiveContains(q)
+            item.searchText.localizedCaseInsensitiveContains(q)
+                || (item.appName ?? "").localizedCaseInsensitiveContains(q)
                 || item.smartType.rawValue.localizedCaseInsensitiveContains(q)
         }
     }

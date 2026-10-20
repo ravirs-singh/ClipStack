@@ -14,6 +14,10 @@ A lightweight menu-bar clipboard history app written in Swift (pure AppKit — b
 - Pin items so they survive "Clear" and history trimming
 - Auto-paste into the app you were using (optional; needs Accessibility permission)
 - **Preferences window**: hotkey recorder, history size, polling rate, rich-text capture, auto-paste, launch at login
+- **Screenshot manager**: new screenshots are captured automatically, OCR'd on-device (searchable, "Copy text"), shown in the
+  notch with Copy / Text / Reveal / Trash, optionally moved into `~/Pictures/Screenshots/YYYY-MM/` and renamed by date + app.
+  Pasting a screenshot gives the file to Finder/Slack and the image to editors; drag chips out of the notch as files.
+- Filter bar: All / Text / Images / Screenshots / Files
 - **Interactive notch** (Dynamic-Island style): sits over the MacBook notch, flashes what you just copied, expands on hover
   to show your last 6 clips as tappable chips (tap = paste), click to open full history, and accepts drag-and-drop of
   files/text/images straight into the clipboard. Macs without a notch get a small pill at the top of the screen.
@@ -48,5 +52,6 @@ For development: `swift run` (menu-bar icon appears; "Launch at login" is only a
 | `Settings.swift` | UserDefaults-backed settings, launch-at-login, key names |
 | `PreferencesWindow.swift` | Preferences window + hotkey recorder |
 | `HistoryView.swift` | Popover UI: list, preview pane, actions, quick-pick |
+| `ScreenshotWatcher.swift` | Spotlight watcher, organize/rename, Vision OCR |
 | `NotchWindow.swift` | Notch panel: shape, toast, hover-expand chips, drag & drop |
 | `AppDelegate.swift` | Status item, popover, wiring |

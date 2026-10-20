@@ -23,7 +23,10 @@ enum Paster {
                 if let html = item.html { pb.setString(html, forType: .html) }
             }
         case .image:
-            if let img = item.image { pb.writeObjects([img]) }
+            if let src = item.sourceURL, item.sourceExists, let full = NSImage(contentsOf: src) {
+                // File URL first so Finder/Slack get the file; image so editors get pixels.
+                pb.writeObjects([src as NSURL, full] as [NSPasteboardWriting])
+            } else if let img = item.image { pb.writeObjects([img]) }
         case .files:
             pb.writeObjects(item.fileURLs as [NSURL])
         }

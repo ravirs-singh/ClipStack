@@ -12,12 +12,17 @@ final class PreferencesWindowController: NSWindowController {
     private let autoPasteCheck = NSButton(checkboxWithTitle: "Paste into the frontmost app when an item is chosen", target: nil, action: nil)
     private let richCheck = NSButton(checkboxWithTitle: "Keep rich text formatting (RTF / HTML)", target: nil, action: nil)
     private let loginCheck = NSButton(checkboxWithTitle: "Launch ClipStack at login", target: nil, action: nil)
+    private let shotCheck = NSButton(checkboxWithTitle: "Capture new screenshots into history", target: nil, action: nil)
+    private let shotOCRCheck = NSButton(checkboxWithTitle: "Recognize text in screenshots (searchable, on-device)", target: nil, action: nil)
+    private let shotOrganizeCheck = NSButton(checkboxWithTitle: "Move screenshots into monthly folders, named by date and app", target: nil, action: nil)
+    private let shotFolderButton = NSButton(title: "Choose Folder…", target: nil, action: nil)
+    private let shotFolderLabel = NSTextField(labelWithString: "")
     private let notchCheck = NSButton(checkboxWithTitle: "Show interactive notch (hover to expand, drop to copy)", target: nil, action: nil)
     private let notchToastCheck = NSButton(checkboxWithTitle: "Flash the notch when something is copied", target: nil, action: nil)
     private let accessibilityLabel = NSTextField(wrappingLabelWithString: "")
 
     private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 420),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 540),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "ClipStack Preferences"
         window.isReleasedWhenClosed = false
@@ -68,6 +73,15 @@ final class PreferencesWindowController: NSWindowController {
         richCheck.target = self; richCheck.action = #selector(richChanged)
         loginCheck.target = self; loginCheck.action = #selector(loginChanged)
         notchCheck.target = self; notchCheck.action = #selector(notchChanged)
+        shotCheck.target = self; shotCheck.action = #selector(shotChanged)
+        shotOCRCheck.target = self; shotOCRCheck.action = #selector(shotChanged)
+        shotOrganizeCheck.target = self; shotOrganizeCheck.action = #selector(shotChanged)
+        shotFolderButton.target = self; shotFolderButton.action = #selector(chooseFolder)
+        shotFolderButton.controlSize = .small
+        shotFolderLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        shotFolderLabel.textColor = .secondaryLabelColor
+        shotFolderLabel.lineBreakMode = .byTruncatingMiddle
+        let folderRow = NSStackView(views: [shotFolderButton, shotFolderLabel]); folderRow.spacing = 8
         notchToastCheck.target = self; notchToastCheck.action = #selector(notchToastChanged)
 
         accessibilityLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -83,6 +97,10 @@ final class PreferencesWindowController: NSWindowController {
             [label("Auto-paste:"), autoPasteCheck],
             [NSGridCell.emptyContentView, accessibilityLabel],
             [NSGridCell.emptyContentView, axBtn],
+            [label("Screenshots:"), shotCheck],
+            [NSGridCell.emptyContentView, shotOCRCheck],
+            [NSGridCell.emptyContentView, shotOrganizeCheck],
+            [NSGridCell.emptyContentView, folderRow],
             [label("Notch:"), notchCheck],
             [NSGridCell.emptyContentView, notchToastCheck],
             [label("Startup:"), loginCheck],
@@ -116,6 +134,13 @@ final class PreferencesWindowController: NSWindowController {
         richCheck.state = Settings.captureRichText ? .on : .off
         loginCheck.state = Settings.launchAtLogin ? .on : .off
         notchCheck.state = Settings.notchEnabled ? .on : .off
+        shotCheck.state = Settings.screenshotsEnabled ? .on : .off
+        shotOCRCheck.state = Settings.screenshotOCR ? .on : .off
+        shotOrganizeCheck.state = Settings.screenshotOrganize ? .on : .off
+        shotOCRCheck.isEnabled = Settings.screenshotsEnabled
+        shotOrganizeCheck.isEnabled = Settings.screenshotsEnabled
+        shotFolderButton.isEnabled = Settings.screenshotsEnabled && Settings.screenshotOrganize
+        shotFolderLabel.stringValue = Settings.screenshotFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         notchToastCheck.state = Settings.notchToasts ? .on : .off
         notchToastCheck.isEnabled = Settings.notchEnabled
         loginCheck.isEnabled = Bundle.main.bundleURL.pathExtension == "app"
@@ -137,6 +162,18 @@ final class PreferencesWindowController: NSWindowController {
     @objc private func pollChanged() { Settings.pollInterval = pollPopup.selectedItem?.representedObject as? Double ?? 0.5 }
     @objc private func autoPasteChanged() { Settings.autoPaste = autoPasteCheck.state == .on }
     @objc private func richChanged() { Settings.captureRichText = richCheck.state == .on }
+    @objc private func shotChanged() {
+        Settings.screenshotsEnabled = shotCheck.state == .on
+        Settings.screenshotOCR = shotOCRCheck.state == .on
+        Settings.screenshotOrganize = shotOrganizeCheck.state == .on
+        refresh()
+    }
+    @objc private func chooseFolder() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
+        p.directoryURL = Settings.screenshotFolder
+        if p.runModal() == .OK, let url = p.url { Settings.screenshotFolder = url; refresh() }
+    }
     @objc private func notchChanged() { Settings.notchEnabled = notchCheck.state == .on; refresh() }
     @objc private func notchToastChanged() { Settings.notchToasts = notchToastCheck.state == .on }
     @objc private func loginChanged() { Settings.launchAtLogin = loginCheck.state == .on; refresh() }

@@ -4,7 +4,9 @@ import AppKit
 final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     private let store: ClipStore
     private let monitor: ClipboardMonitor
+    private let screenshots: ScreenshotWatcher
     private let dismiss: () -> Void
+    private let filterControl = NSSegmentedControl()
 
     private let searchField = NSSearchField()
     private let tableView = NSTableView()
@@ -25,10 +27,21 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
 
     private var results: [ClipItem] = []
     private var keyMonitor: Any?
+    private var imageBottomFull: NSLayoutConstraint!
+    private var imageBottomHalf: NSLayoutConstraint!
+    private var scrollTopFull: NSLayoutConstraint!
+    private var scrollTopHalf: NSLayoutConstraint!
+    private var splitPreview = false {
+        didSet {
+            imageBottomFull.isActive = !splitPreview; scrollTopFull.isActive = !splitPreview
+            imageBottomHalf.isActive = splitPreview; scrollTopHalf.isActive = splitPreview
+        }
+    }
 
-    init(store: ClipStore, monitor: ClipboardMonitor, dismiss: @escaping () -> Void) {
+    init(store: ClipStore, monitor: ClipboardMonitor, screenshots: ScreenshotWatcher, dismiss: @escaping () -> Void) {
         self.store = store
         self.monitor = monitor
+        self.screenshots = screenshots
         self.dismiss = dismiss
         super.init(nibName: nil, bundle: nil)
         store.onChange = { [weak self] in self?.reload() }
@@ -71,7 +84,16 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         emptyLabel.isHidden = true
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let left = NSStackView(views: [pad(searchField, 10, 10, 8, 10), scrollView])
+        filterControl.segmentStyle = .rounded
+        filterControl.controlSize = .small
+        filterControl.segmentCount = ClipStore.Filter.allCases.count
+        for f in ClipStore.Filter.allCases { filterControl.setLabel(f.title, forSegment: f.rawValue) }
+        filterControl.selectedSegment = 0
+        filterControl.target = self
+        filterControl.action = #selector(filterChanged)
+        filterControl.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let left = NSStackView(views: [pad(searchField, 10, 10, 4, 10), pad(filterControl, 0, 10, 6, 10), scrollView])
         left.orientation = .vertical
         left.spacing = 0
         left.alignment = .leading
@@ -139,13 +161,16 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         previewArea.addSubview(previewScroll)
         previewArea.addSubview(previewImage)
         previewArea.addSubview(colorSwatch)
+        imageBottomFull = previewImage.bottomAnchor.constraint(equalTo: previewArea.bottomAnchor, constant: -8)
+        imageBottomHalf = previewImage.bottomAnchor.constraint(equalTo: previewArea.centerYAnchor, constant: -4)
+        scrollTopFull = previewScroll.topAnchor.constraint(equalTo: previewArea.topAnchor)
+        scrollTopHalf = previewScroll.topAnchor.constraint(equalTo: previewArea.centerYAnchor)
+        imageBottomFull.isActive = true; scrollTopFull.isActive = true
         NSLayoutConstraint.activate([
-            previewScroll.topAnchor.constraint(equalTo: previewArea.topAnchor),
             previewScroll.bottomAnchor.constraint(equalTo: previewArea.bottomAnchor),
             previewScroll.leadingAnchor.constraint(equalTo: previewArea.leadingAnchor),
             previewScroll.trailingAnchor.constraint(equalTo: previewArea.trailingAnchor),
             previewImage.topAnchor.constraint(equalTo: previewArea.topAnchor, constant: 8),
-            previewImage.bottomAnchor.constraint(equalTo: previewArea.bottomAnchor, constant: -8),
             previewImage.leadingAnchor.constraint(equalTo: previewArea.leadingAnchor, constant: 8),
             previewImage.trailingAnchor.constraint(equalTo: previewArea.trailingAnchor, constant: -8),
             colorSwatch.topAnchor.constraint(equalTo: previewArea.topAnchor, constant: 8),
@@ -235,6 +260,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         searchField.stringValue = ""
         reload()
         view.window?.makeFirstResponder(searchField)
+        updateHint()
         // ⌘1–⌘9 quick-pick, ⇧⏎ plain paste — captured app-wide while the popover is open.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
             guard let self else { return e }
@@ -264,7 +290,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
 
     private func reload() {
         let previousID = selected?.id
-        results = store.filtered(searchField.stringValue)
+        results = store.filtered(searchField.stringValue, filter: currentFilter)
         tableView.reloadData()
         emptyLabel.stringValue = searchField.stringValue.isEmpty ? "Nothing copied yet" : "No matches"
         emptyLabel.isHidden = !results.isEmpty
@@ -276,6 +302,9 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         }
         updatePreview()
     }
+
+    private var currentFilter: ClipStore.Filter { ClipStore.Filter(rawValue: filterControl.selectedSegment) ?? .all }
+    @objc private func filterChanged() { reload() }
 
     private var selected: ClipItem? {
         let r = tableView.selectedRow
@@ -325,6 +354,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         colorSwatch.isHidden = true
         previewScroll.isHidden = false
         openButton.isHidden = true
+        splitPreview = false
 
         switch item.kind {
         case .image:
@@ -332,10 +362,33 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
             previewImage.isHidden = false
             previewScroll.isHidden = true
             if let img = item.image { meta.append("\(Int(img.size.width)) × \(Int(img.size.height)) px") }
-            if let p = item.imagePath, let size = try? FileManager.default.attributesOfItem(atPath: p)[.size] as? Int {
+            if let p = item.sourcePath ?? item.imagePath, let size = try? FileManager.default.attributesOfItem(atPath: p)[.size] as? Int {
                 meta.append(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
             }
-            actionsPopup.isEnabled = false
+            if item.isScreenshot {
+                if let app = item.appName { meta.append(app) }
+                if !item.sourceExists { meta.append("file missing") }
+                openButton.title = "Reveal"
+                openButton.isHidden = !item.sourceExists
+                let copyText = NSMenuItem(title: item.ocrText == nil ? "Recognize text" : "Copy recognized text", action: #selector(copyOCR), keyEquivalent: "")
+                copyText.target = self
+                actionsPopup.menu?.addItem(copyText)
+                let trash = NSMenuItem(title: "Move file to Trash", action: #selector(trashShot), keyEquivalent: "")
+                trash.target = self
+                actionsPopup.menu?.addItem(trash)
+                actionsPopup.isEnabled = true
+                // Show the recognized text under the image when we have it.
+                if let ocr = item.ocrText, !ocr.isEmpty {
+                    previewText.string = ocr
+                    previewText.font = .systemFont(ofSize: 11)
+                    previewText.textColor = .secondaryLabelColor
+                    previewScroll.isHidden = false
+                    previewImage.isHidden = false
+                    splitPreview = true
+                }
+            } else {
+                actionsPopup.isEnabled = false
+            }
 
         case .files:
             previewText.string = (item.filePaths ?? []).joined(separator: "\n")
@@ -402,10 +455,26 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
     @objc private func deleteSelected() { if let s = clickedOrSelected { store.remove(s) } }
     @objc private func pastePlain() { if let s = selected { use(s, plain: true) } }
 
+    @objc private func copyOCR() {
+        guard let item = selected else { return }
+        if let t = item.ocrText, !t.isEmpty {
+            dismiss()
+            Paster.use(item, monitor: monitor, override: t)
+        } else {
+            screenshots.ocrNow(item)
+        }
+    }
+
+    @objc private func trashShot() {
+        if let item = selected, item.isScreenshot { store.trashScreenshot(item) }
+    }
+
     @objc private func openSelected() {
         guard let item = selected else { return }
         dismiss()
-        if item.kind == .files {
+        if item.isScreenshot, let url = item.sourceURL {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else if item.kind == .files {
             NSWorkspace.shared.activateFileViewerSelecting(item.fileURLs)
         } else if let url = item.smartType.openURL(for: item.text ?? "") {
             NSWorkspace.shared.open(url)

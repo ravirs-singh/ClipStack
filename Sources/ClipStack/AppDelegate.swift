@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover!
     private var hotKey: HotKey?
     private var notch: NotchController?
+    private var screenshots: ScreenshotWatcher?
     private var previousApp: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,10 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
+        screenshots = ScreenshotWatcher(store: store)
+
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = HistoryViewController(
-            store: store, monitor: monitor, dismiss: { [weak self] in self?.closePopover() })
+            store: store, monitor: monitor, screenshots: screenshots!, dismiss: { [weak self] in self?.closePopover() })
 
         hotKey = HotKey { [weak self] in self?.togglePopover() }
         notch = NotchController(store: store, monitor: monitor, openHistory: { [weak self] in self?.showPopover() })

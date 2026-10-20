@@ -13,6 +13,7 @@ enum SmartType: String {
     case number = "Number"
     case code = "Code"
     case image = "Image"
+    case screenshot = "Screenshot"
     case files = "Files"
 
     var symbol: String {
@@ -27,6 +28,7 @@ enum SmartType: String {
         case .number: return "number"
         case .code: return "chevron.left.forwardslash.chevron.right"
         case .image: return "photo"
+        case .screenshot: return "camera.viewfinder"
         case .files: return "folder"
         }
     }
@@ -40,6 +42,7 @@ enum SmartType: String {
         case .json, .code: return .systemPurple
         case .number: return .systemIndigo
         case .image: return .systemOrange
+        case .screenshot: return .systemCyan
         case .files: return .systemBrown
         case .plain, .richText: return .secondaryLabelColor
         }
@@ -49,7 +52,7 @@ enum SmartType: String {
 
     static func detect(_ item: ClipItem) -> SmartType {
         switch item.kind {
-        case .image: return .image
+        case .image: return item.isScreenshot ? .screenshot : .image
         case .files: return .files
         case .text: break
         }

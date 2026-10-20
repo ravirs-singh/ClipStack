@@ -15,6 +15,9 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let html: String?          // optional HTML alongside plain text
     let imagePath: String?     // on-disk PNG path (image items)
     let filePaths: [String]?   // file URLs copied from Finder
+    var sourcePath: String?    // screenshots: the original file on disk (imagePath holds a thumbnail)
+    var ocrText: String?       // screenshots: recognized text
+    var appName: String?       // screenshots: app that was frontmost when captured
     let createdAt: Date
     var pinned: Bool
 
@@ -40,6 +43,9 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
 
     var isRich: Bool { rtf != nil || html != nil }
+    var isScreenshot: Bool { kind == .image && sourcePath != nil }
+    var sourceURL: URL? { sourcePath.map { URL(fileURLWithPath: $0) } }
+    var sourceExists: Bool { sourcePath.map { FileManager.default.fileExists(atPath: $0) } ?? false }
 
     var preview: String {
         switch kind {
@@ -48,6 +54,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
             let firstLine = t.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? t
             return firstLine.count > 120 ? String(firstLine.prefix(120)) + "…" : firstLine
         case .image:
+            if let src = sourcePath { return (src as NSString).lastPathComponent }
             if let img = image { return "Image \(Int(img.size.width))×\(Int(img.size.height))" }
             return "Image"
         case .files:
@@ -62,6 +69,9 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
 
     var fileURLs: [URL] { (filePaths ?? []).map { URL(fileURLWithPath: $0) } }
+
+    /// Text used for searching (plain text or OCR).
+    var searchText: String { text ?? ocrText ?? "" }
 
     /// Lazily detected content type (URL, email, JSON…). Only meaningful for text items.
     var smartType: SmartType { SmartType.detect(self) }

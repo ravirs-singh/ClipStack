@@ -17,13 +17,14 @@ final class NotchController {
     private var notchSize = NSSize(width: 200, height: 32)
     private var hasRealNotch = false
 
-    private enum State { case collapsed, toast, expanded }
+    private enum State { case collapsed, toast, shot, expanded }
     private var state: State = .collapsed
     private var collapseTimer: Timer?
     private var hovering = false
     private var observers: [NSObjectProtocol] = []
 
     private let expandedSize = NSSize(width: 560, height: 190)
+    private let shotToastSize = NSSize(width: 520, height: 96)
 
     init(store: ClipStore, monitor: ClipboardMonitor, openHistory: @escaping () -> Void) {
         self.store = store
@@ -37,6 +38,7 @@ final class NotchController {
         notchView.onPick = { [weak self] item in self?.pick(item) }
         notchView.onOpenHistory = { [weak self] in self?.collapse(); self?.openHistory() }
         notchView.onDrop = { [weak self] in self?.handleDrop($0) ?? false }
+        notchView.onShotAction = { [weak self] action, item in self?.shotAction(action, item) }
 
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
@@ -99,6 +101,7 @@ final class NotchController {
         switch state {
         case .collapsed: size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0), height: notchSize.height)
         case .toast:     size = NSSize(width: max(notchSize.width + 240, 380), height: notchSize.height + 14)
+        case .shot:      size = NSSize(width: max(shotToastSize.width, notchSize.width + 200), height: notchSize.height + shotToastSize.height)
         case .expanded:  size = expandedSize
         }
         let x = screen.frame.midX - size.width / 2
@@ -112,6 +115,7 @@ final class NotchController {
             switch new {
             case .collapsed: return .collapsed
             case .toast: return .toast
+            case .shot: return .shot
             case .expanded: return .expanded
             }
         }()
@@ -133,7 +137,7 @@ final class NotchController {
     private func mouseEntered() {
         hovering = true
         collapseTimer?.invalidate()
-        if state != .expanded { expand() }
+        if state != .expanded && state != .shot { expand() }
     }
 
     private func mouseExited() {
@@ -169,8 +173,24 @@ final class NotchController {
             return
         }
         notchView.toastItem = item
-        setState(.toast, animated: true)
-        scheduleCollapse(after: 2.2)
+        if item.isScreenshot {
+            setState(.shot, animated: true)
+            scheduleCollapse(after: 6)
+        } else {
+            setState(.toast, animated: true)
+            scheduleCollapse(after: 2.2)
+        }
+    }
+
+    private func shotAction(_ action: NotchView.ShotAction, _ item: ClipItem) {
+        collapse()
+        switch action {
+        case .copy: Paster.copy(item, monitor: monitor)
+        case .text:
+            if let t = item.ocrText, !t.isEmpty { Paster.copy(item, monitor: monitor, override: t) } else { NSSound.beep() }
+        case .reveal: if let u = item.sourceURL { NSWorkspace.shared.activateFileViewerSelecting([u]) }
+        case .trash: store.trashScreenshot(item)
+        }
     }
 
     private func pick(_ item: ClipItem) {
@@ -197,7 +217,9 @@ final class NotchController {
 // MARK: - View
 
 final class NotchView: NSView {
-    enum Mode { case collapsed, toast, expanded }
+    enum Mode { case collapsed, toast, shot, expanded }
+    enum ShotAction { case copy, text, reveal, trash }
+    var onShotAction: ((ShotAction, ClipItem) -> Void)?
 
     var mode: Mode = .collapsed { didSet { needsLayout = true; needsDisplay = true } }
     var baseNotchSize = NSSize(width: 200, height: 32)
@@ -221,6 +243,11 @@ final class NotchView: NSView {
     private let historyButton = NSButton(title: "History", target: nil, action: nil)
     private let dropHint = NSTextField(labelWithString: "Drop files or text here to copy")
     private var dragHighlight = false { didSet { needsDisplay = true } }
+    private let shotThumb = NSImageView()
+    private let shotTitle = NSTextField(labelWithString: "")
+    private let shotSub = NSTextField(labelWithString: "")
+    private let shotButtons = NSStackView()
+    private var shotViews: [NSView] { [shotThumb, shotTitle, shotSub, shotButtons] }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -256,6 +283,29 @@ final class NotchView: NSView {
         chipsStack.distribution = .fillEqually
         [header, historyButton, chipsStack, dropHint].forEach { $0.isHidden = true; addSubview($0) }
 
+        shotThumb.imageScaling = .scaleProportionallyUpOrDown
+        shotThumb.wantsLayer = true
+        shotThumb.layer?.cornerRadius = 6
+        shotThumb.layer?.masksToBounds = true
+        shotTitle.textColor = .white
+        shotTitle.font = .systemFont(ofSize: 12, weight: .semibold)
+        shotTitle.lineBreakMode = .byTruncatingMiddle
+        shotSub.textColor = NSColor.white.withAlphaComponent(0.6)
+        shotSub.font = .systemFont(ofSize: 10)
+        shotButtons.orientation = .horizontal
+        shotButtons.spacing = 6
+        for (title, sym, action) in [("Copy", "doc.on.doc", ShotAction.copy), ("Text", "text.viewfinder", .text),
+                                     ("Reveal", "folder", .reveal), ("Trash", "trash", .trash)] {
+            let b = NSButton(title: title, image: NSImage(systemSymbolName: sym, accessibilityDescription: title)!, target: self, action: #selector(shotButtonTapped(_:)))
+            b.bezelStyle = .inline
+            b.controlSize = .small
+            b.imagePosition = .imageLeading
+            b.contentTintColor = .white
+            b.tag = [ShotAction.copy, .text, .reveal, .trash].firstIndex(of: action)!
+            shotButtons.addArrangedSubview(b)
+        }
+        shotViews.forEach { $0.isHidden = true; addSubview($0) }
+
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
         registerForDraggedTypes([.fileURL, .string, .tiff, .png])
     }
@@ -276,8 +326,21 @@ final class NotchView: NSView {
         switch mode {
         case .collapsed:
             toastStack.isHidden = true
+            shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
+        case .shot:
+            toastStack.isHidden = true
+            setExpandedVisible(false)
+            shotViews.forEach { $0.isHidden = false }
+            let top = baseNotchSize.height + 10
+            let thumbH = bounds.height - top - 10
+            shotThumb.frame = NSRect(x: padX, y: top, width: thumbH * 1.5, height: thumbH)
+            let tx = padX + thumbH * 1.5 + 12
+            shotTitle.frame = NSRect(x: tx, y: top, width: bounds.width - tx - padX, height: 16)
+            shotSub.frame = NSRect(x: tx, y: top + 18, width: bounds.width - tx - padX, height: 14)
+            shotButtons.frame = NSRect(x: tx, y: bounds.height - 34, width: bounds.width - tx - padX, height: 24)
         case .toast:
+            shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
             toastStack.isHidden = false
             let w = bounds.width - padX * 2
@@ -285,6 +348,7 @@ final class NotchView: NSView {
             toastIcon.frame.size = NSSize(width: 16, height: 16)
         case .expanded:
             toastStack.isHidden = true
+            shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(true)
             let top = baseNotchSize.height + 8
             header.frame = NSRect(x: padX, y: top, width: 200, height: 16)
@@ -333,6 +397,11 @@ final class NotchView: NSView {
         let t = item.smartType
         toastIcon.image = NSImage(systemSymbolName: t.symbol, accessibilityDescription: t.rawValue)
         toastLabel.stringValue = "Copied · " + item.preview
+        if item.isScreenshot {
+            shotThumb.image = item.image
+            shotTitle.stringValue = "Screenshot saved · " + item.preview
+            shotSub.stringValue = [item.appName, item.image.map { "\(Int($0.size.width))×\(Int($0.size.height))" }].compactMap { $0 }.joined(separator: " · ")
+        }
     }
 
     private func rebuildChips() {
@@ -351,6 +420,10 @@ final class NotchView: NSView {
     }
 
     @objc private func openHistoryTapped() { onOpenHistory?() }
+    @objc private func shotButtonTapped(_ sender: NSButton) {
+        guard let item = toastItem else { return }
+        onShotAction?([ShotAction.copy, .text, .reveal, .trash][sender.tag], item)
+    }
 
     // MARK: Mouse
 
@@ -385,9 +458,10 @@ final class NotchView: NSView {
 // MARK: - Chip
 
 /// A tappable card showing one recent clip.
-final class ChipView: NSView {
+final class ChipView: NSView, NSDraggingSource {
     var onTap: (() -> Void)?
     private let item: ClipItem
+    private var dragStart: NSPoint?
 
     init(item: ClipItem, index: Int) {
         self.item = item
@@ -449,7 +523,24 @@ final class ChipView: NSView {
 
     override func mouseEntered(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.22).cgColor }
     override func mouseExited(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.12).cgColor }
-    override func mouseUp(with event: NSEvent) { onTap?() }
+    override func mouseDown(with event: NSEvent) { dragStart = event.locationInWindow }
+    override func mouseUp(with event: NSEvent) { if dragStart != nil { onTap?() }; dragStart = nil }
+
+    /// Drag a screenshot or file chip out of the notch to drop it into another app.
+    override func mouseDragged(with event: NSEvent) {
+        guard let start = dragStart, hypot(event.locationInWindow.x - start.x, event.locationInWindow.y - start.y) > 6 else { return }
+        dragStart = nil
+        let urls: [URL] = item.isScreenshot ? (item.sourceURL.map { [$0] } ?? []) : item.fileURLs
+        guard !urls.isEmpty else { return }
+        let dragItems = urls.map { url -> NSDraggingItem in
+            let di = NSDraggingItem(pasteboardWriter: url as NSURL)
+            di.setDraggingFrame(bounds, contents: item.image ?? NSWorkspace.shared.icon(forFile: url.path))
+            return di
+        }
+        beginDraggingSession(with: dragItems, event: event, source: self)
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
 }
 
 private extension NSBezierPath {

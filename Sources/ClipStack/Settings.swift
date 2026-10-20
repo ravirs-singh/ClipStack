@@ -40,6 +40,28 @@ enum Settings {
         set { d.set(newValue, forKey: "notchToasts"); notify() }
     }
 
+    // MARK: Screenshots
+
+    static var screenshotsEnabled: Bool {
+        get { d.object(forKey: "screenshotsEnabled") as? Bool ?? true }
+        set { d.set(newValue, forKey: "screenshotsEnabled"); notify() }
+    }
+    static var screenshotOCR: Bool {
+        get { d.object(forKey: "screenshotOCR") as? Bool ?? true }
+        set { d.set(newValue, forKey: "screenshotOCR"); notify() }
+    }
+    static var screenshotOrganize: Bool {
+        get { d.object(forKey: "screenshotOrganize") as? Bool ?? false }
+        set { d.set(newValue, forKey: "screenshotOrganize"); notify() }
+    }
+    static var screenshotFolder: URL {
+        get {
+            if let p = d.string(forKey: "screenshotFolder") { return URL(fileURLWithPath: p) }
+            return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Pictures/Screenshots")
+        }
+        set { d.set(newValue.path, forKey: "screenshotFolder"); notify() }
+    }
+
     // MARK: Hotkey (default ⌘⇧V)
 
     static var hotKeyCode: UInt32 {
