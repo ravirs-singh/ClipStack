@@ -187,7 +187,8 @@ final class AudioBarsView: NSView {
         for (i, b) in bars.enumerated() {
             let a = CAKeyframeAnimation(keyPath: "transform.scale.y")
             let seq: [CGFloat] = [0.3, 1.0, 0.5, 0.85, 0.35, 0.7, 0.3]
-            a.values = Array(seq[i % seq.count...] + seq[..<(i % seq.count)])
+            let k = i % seq.count
+            a.values = Array(seq[k...]) + Array(seq[..<k])
             a.duration = 0.9 + Double(i) * 0.13
             a.repeatCount = .infinity
             a.autoreverses = true
