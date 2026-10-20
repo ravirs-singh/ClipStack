@@ -293,8 +293,16 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
     }
 
+    /// Modification time of the running binary — tells you at a glance whether a rebuild actually launched.
+    private static let buildStamp: String = {
+        let path = Bundle.main.executablePath ?? CommandLine.arguments[0]
+        guard let date = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date else { return "?" }
+        let f = DateFormatter(); f.dateFormat = "MMM d HH:mm"
+        return f.string(from: date)
+    }()
+
     private func updateHint() {
-        hintLabel.stringValue = "⏎ paste · ⇧⏎ plain · ⌘1–9 quick · \(Settings.hotKeyDescription) toggle"
+        hintLabel.stringValue = "⏎ paste · ⇧⏎ plain · ⌘1–9 quick · \(Settings.hotKeyDescription) toggle · build \(Self.buildStamp)"
     }
 
     // MARK: Data
