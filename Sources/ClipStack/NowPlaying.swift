@@ -37,6 +37,7 @@ final class NowPlayingMonitor {
 
     private var timer: Timer?
     private var lastScriptError = ""
+    private var lastScriptErrorAt = Date.distantPast
     private var artworkCache: (key: String, image: NSImage?)?
     private var fetchingArtwork = false
     private var observer: NSObjectProtocol?
@@ -238,8 +239,10 @@ final class NowPlayingMonitor {
         guard let s = NSAppleScript(source: source) else { return nil }
         let out = s.executeAndReturnError(&err)
         if let err {
-            let msg = "\(err[NSAppleScript.errorMessage] ?? "")"
-            if msg != lastScriptError { NSLog("ClipStack: AppleScript error: \(msg)"); lastScriptError = msg }
+            let msg = "\(err[NSAppleScript.errorMessage] ?? "") (\(err[NSAppleScript.errorNumber] ?? ""))"
+            if msg != lastScriptError || Date().timeIntervalSince(lastScriptErrorAt) > 20 {
+                NSLog("ClipStack: AppleScript error: \(msg)"); lastScriptError = msg; lastScriptErrorAt = Date()
+            }
             return nil
         }
         return out.stringValue
