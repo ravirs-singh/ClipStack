@@ -16,21 +16,23 @@
 
 **Share caption:** "Your Mac remembers one thing you copied. ClipStack remembers 200 — and puts your music in the notch."
 
-**Format:** landscape 1920×1080, 30 fps, 20 s. No fictional data: all clip text is real-looking developer/ops snippets with no personal data; the song shown is a placeholder title.
+**Format:** landscape 1920×1080 (`brag.mp4`) and a vertical 1080×1920 Reels/Shorts cut (`brag-vertical.mp4`), 30 fps, 25 s. No fictional data: all clip text is real-looking developer/ops snippets with no personal data; the song shown is a placeholder title.
 
-## Storyboard (20.0 s)
+## Storyboard (25.0 s)
 
 | # | Time | Scene | On screen | Motion / sound |
 |---|---|---|---|---|
-| 1 | 0.0–3.3 | Hook | "You copy a couple hundred things a day." then "Your Mac remembers one." | Word-by-word rise; soft pad swell; tick on line 2 |
-| 2 | 3.3–6.5 | Reveal | App icon springs in, "ClipStack" wordmark, tagline "Clipboard history, screenshots and a living notch. For macOS." | Icon spring + glow bloom; bass note + sparkle |
-| 3 | 6.5–11.0 | History | History window rises; rows pop in one by one; "invoice" typed into search → list filters to 2 rows; ⌘2 key cap pulses; preview shows text. Caption: "Everything you've copied. Searchable. ⌘1–9 pastes." | Staggered pops with soft ticks; key clicks on typing |
-| 4 | 11.0–15.2 | Notch | Top of a Mac screen with menu bar. Notch grows wings: album art + audio bars. Cursor hovers; island expands: player card (art, title, progress, ⏮⏯⏭) + RECENT chips. Captions: "Your notch, alive." → "Now Playing · recent clips · drop files on it." | Whoosh on expand, synced to the beat |
-| 5 | 15.2–18.0 | Screenshot | Crosshair selection draws across a window; shutter flash; thumbnail flies into the island with Copy · Text · Reveal · Trash; OCR text lines slide in. Caption: "Screenshots land instantly — text included." | Shutter click + rising chime |
-| 6 | 18.0–20.0 | Outro | Icon + "ClipStack" + "Free & open source" + "github.com/ravirs-singh/ClipStack" + "⌘⇧V" | Everything settles; music resolves to the tonic and fades |
+| 1 | 0.0–3.3 | Hook | "You copy a couple hundred things a day." then "Your Mac remembers one." | Word-by-word rise; pad swell; tick on line 2 |
+| 2 | 3.3–6.5 | Reveal | App icon springs in, "ClipStack", tagline | Icon spring + glow; bass note + sparkle |
+| 3a | 6.5–10.0 | Hotkey → history | ⌘ ⇧ V key caps press; History window rises; six rows pop in (code, invoice text, URL, screenshot, JSON, files). Caption: "Everything you copy, kept. Text, links, images, files." | Key click; staggered ticks |
+| 3b | 10.0–12.9 | Search + paste | "invoice" typed → list filters to 2; ⌘1 key cap pulses, row highlights. Caption: "Search it. ⌘1–⌘9 pastes it anywhere." | Key clicks; blip on ⌘1 |
+| 3c | 12.9–16.0 | Smart actions | JSON row selected, "JSON" badge; Actions menu opens (Pretty-print, Minify, Trim, …); Pretty-print highlighted → preview reformats. Caption: "It knows what it copied. One-click actions." | Menu ticks; chime on reformat |
+| 4 | 16.0–20.2 | Notch | Notch grows wings (album art + audio bars); cursor hovers; island expands with player card + RECENT chips. Captions: "Your notch, alive." → "Now Playing · recent clips · drop files on it." | Whooshes synced to beat |
+| 5 | 20.2–23.0 | Screenshot | Crosshair selection; shutter; thumbnail flies into the island with Copy · Text · Reveal · Trash; recognized-text card. Caption: "Screenshots land instantly — text included." | Shutter + chime |
+| 6 | 23.0–25.0 | Outro | Icon + "ClipStack" + "Free & open source" + GitHub URL + ⌘⇧V | Music resolves and fades |
 
-Transitions dip through the dark background (old out, then new in) — no crossfading busy layouts.
+Transitions dip through the dark background — no crossfading busy layouts. The vertical cut stacks the History window's list above its preview and zooms the Mac scenes around the notch.
 
 ## Sound
 
-One synthesized piece in A minor, 112 BPM: warm pad chords (Am–F–C–G), a plucked arpeggio, soft kick + hat from scene 3 on, sidechained under. Effects are notes/noises in the same key and reverb: ticks (row pops, typing), a filtered whoosh (island expand), a shutter click + chime (screenshot). Mixed with effects ~10 dB under the music, gentle lowpass, 1.2 s fade at the end.
+One synthesized piece in A minor, 112 BPM: pad chords looping Am–F–C–G, a plucked arpeggio from the reveal, soft kick + hat from the hotkey beat, ducked under. Effects are in key and in the same reverb: key clicks, ticks on pops, whooshes on the island, shutter + chime for the screenshot. Effects ~10 dB under the music, gentle lowpass, 1.4 s fade.
