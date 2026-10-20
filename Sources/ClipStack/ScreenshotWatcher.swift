@@ -165,7 +165,7 @@ final class ScreenshotWatcher {
         return CGImageDestinationFinalize(dest) ? out.path : nil
     }
 
-    private func frontmostAppName() -> String? {
+    func frontmostAppName() -> String? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.bundleIdentifier != Bundle.main.bundleIdentifier else { return nil }
         return app.localizedName
@@ -208,6 +208,40 @@ final class ScreenshotWatcher {
             let text = lines.joined(separator: "\n")
             guard !text.isEmpty else { return }
             DispatchQueue.main.async { self?.store.setOCRText(text, for: item) }
+        }
+    }
+
+    // MARK: Direct capture support
+
+    /// Where ClipStack's own capture should write, honoring the organize setting.
+    func plannedDestination(appName: String?) -> URL {
+        let now = Date()
+        if Settings.screenshotOrganize {
+            let month = DateFormatter(); month.dateFormat = "yyyy-MM"
+            let stamp = DateFormatter(); stamp.dateFormat = "yyyy-MM-dd HH.mm.ss"
+            let dir = Settings.screenshotFolder.appendingPathComponent(month.string(from: now), isDirectory: true)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            var name = stamp.string(from: now)
+            if let appName, !appName.isEmpty { name += " – " + appName.replacingOccurrences(of: "/", with: "-") }
+            return dir.appendingPathComponent(name).appendingPathExtension("png")
+        }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd 'at' h.mm.ss a"
+        return Self.captureFolder.appendingPathComponent("Screenshot \(f.string(from: now)).png")
+    }
+
+    /// Mark a path as ours so the folder/Spotlight watchers don't ingest it a second time.
+    func reserve(_ url: URL) { seen.insert(url.path); knownFiles.insert(url.lastPathComponent) }
+
+    /// Ingest a file we wrote ourselves (already in its final place).
+    func ingestNow(_ url: URL, appName: String?) {
+        let ocr = Settings.screenshotOCR
+        let thumbDir = store.imagesDir
+        workQueue.async { [weak self] in
+            guard let self, let thumbPath = Self.makeThumbnail(of: url, maxPixel: 1000, into: thumbDir) else { return }
+            DispatchQueue.main.async {
+                let item = self.store.addScreenshot(source: url, thumbPath: thumbPath, appName: appName)
+                if ocr { self.runOCR(for: item, url: url) }
+            }
         }
     }
 

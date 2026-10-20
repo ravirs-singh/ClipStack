@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: HotKey?
     private var notch: NotchController?
     private var screenshots: ScreenshotWatcher?
+    private var capture: ScreenshotCapture?
     private var previousApp: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -32,7 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = HistoryViewController(
             store: store, monitor: monitor, screenshots: screenshots!, dismiss: { [weak self] in self?.closePopover() })
 
-        hotKey = HotKey { [weak self] in self?.togglePopover() }
+        hotKey = HotKey(binding: { (Settings.hotKeyCode, Settings.hotKeyCarbonModifiers) },
+                        handler: { [weak self] in self?.togglePopover() })
+        capture = ScreenshotCapture(watcher: screenshots!)
         notch = NotchController(store: store, monitor: monitor, openHistory: { [weak self] in self?.showPopover() })
     }
 
@@ -56,6 +59,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showStatusMenu() {
         let menu = NSMenu()
         menu.addItem(withTitle: "Show History  \(Settings.hotKeyDescription)", action: #selector(togglePopover), keyEquivalent: "")
+        menu.addItem(.separator())
+        for kind in CaptureKind.allCases {
+            let mi = NSMenuItem(title: kind.title, action: #selector(captureTapped(_:)), keyEquivalent: "")
+            mi.representedObject = kind.rawValue
+            if let b = Settings.captureHotKey(kind), Settings.captureEnabled {
+                mi.toolTip = KeyNames.describe(keyCode: UInt16(b.keyCode), modifiers: b.modifiers)
+            }
+            menu.addItem(mi)
+        }
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Preferences…", action: #selector(openPreferences), keyEquivalent: ",")
         menu.items.forEach { $0.target = self }
         menu.addItem(.separator())
@@ -68,6 +81,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openPreferences() { PreferencesWindowController.shared.show() }
+
+    @objc private func captureTapped(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let kind = CaptureKind(rawValue: raw) else { return }
+        // Let the menu close before the crosshair appears.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.capture?.capture(kind) }
+    }
 
     @objc func togglePopover() {
         if popover.isShown { closePopover() } else { showPopover() }

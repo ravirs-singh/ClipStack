@@ -172,6 +172,7 @@ final class NotchController {
             if state == .expanded { notchView.items = Array(store.filtered("").prefix(6)) }
             return
         }
+        if item.isScreenshot && !Settings.notchScreenshotToast { return }
         notchView.toastItem = item
         if item.isScreenshot {
             setState(.shot, animated: true)

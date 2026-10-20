@@ -40,6 +40,12 @@ enum Settings {
         set { d.set(newValue, forKey: "notchToasts"); notify() }
     }
 
+    /// Drop the notch down with actions when a screenshot is taken. Off by default.
+    static var notchScreenshotToast: Bool {
+        get { d.object(forKey: "notchScreenshotToast") as? Bool ?? false }
+        set { d.set(newValue, forKey: "notchScreenshotToast"); notify() }
+    }
+
     // MARK: Screenshots
 
     static var screenshotsEnabled: Bool {
@@ -62,6 +68,37 @@ enum Settings {
         set { d.set(newValue.path, forKey: "screenshotFolder"); notify() }
     }
 
+    // MARK: ClipStack's own capture shortcuts (defaults ⌃⇧3 / ⌃⇧4 / ⌃⇧5)
+
+    static var captureEnabled: Bool {
+        get { d.object(forKey: "captureEnabled") as? Bool ?? true }
+        set { d.set(newValue, forKey: "captureEnabled"); notify() }
+    }
+
+    static func captureHotKey(_ kind: CaptureKind) -> (keyCode: UInt32, modifiers: NSEvent.ModifierFlags)? {
+        if d.bool(forKey: "capture.\(kind.rawValue).unbound") { return nil }
+        let defaults: [CaptureKind: Int] = [.screen: kVK_ANSI_3, .area: kVK_ANSI_4, .window: kVK_ANSI_5]
+        let code = d.object(forKey: "capture.\(kind.rawValue).code") as? UInt32 ?? UInt32(defaults[kind]!)
+        let mods = (d.object(forKey: "capture.\(kind.rawValue).mods") as? UInt).map { NSEvent.ModifierFlags(rawValue: $0) } ?? [.control, .shift]
+        return (code, mods)
+    }
+
+    static func setCaptureHotKey(_ kind: CaptureKind, keyCode: UInt32, modifiers: NSEvent.ModifierFlags) {
+        d.set(keyCode, forKey: "capture.\(kind.rawValue).code")
+        d.set(modifiers.rawValue, forKey: "capture.\(kind.rawValue).mods")
+        d.set(false, forKey: "capture.\(kind.rawValue).unbound")
+        notify()
+    }
+
+    static func carbonModifiers(_ f: NSEvent.ModifierFlags) -> UInt32 {
+        var m: UInt32 = 0
+        if f.contains(.command) { m |= UInt32(cmdKey) }
+        if f.contains(.shift)   { m |= UInt32(shiftKey) }
+        if f.contains(.option)  { m |= UInt32(optionKey) }
+        if f.contains(.control) { m |= UInt32(controlKey) }
+        return m
+    }
+
     // MARK: Hotkey (default ⌘⇧V)
 
     static var hotKeyCode: UInt32 {
@@ -78,15 +115,7 @@ enum Settings {
         set { d.set(newValue.rawValue, forKey: "hotKeyMods"); notify() }
     }
 
-    static var hotKeyCarbonModifiers: UInt32 {
-        var m: UInt32 = 0
-        let f = hotKeyModifiers
-        if f.contains(.command) { m |= UInt32(cmdKey) }
-        if f.contains(.shift)   { m |= UInt32(shiftKey) }
-        if f.contains(.option)  { m |= UInt32(optionKey) }
-        if f.contains(.control) { m |= UInt32(controlKey) }
-        return m
-    }
+    static var hotKeyCarbonModifiers: UInt32 { carbonModifiers(hotKeyModifiers) }
 
     static var hotKeyDescription: String {
         KeyNames.describe(keyCode: UInt16(hotKeyCode), modifiers: hotKeyModifiers)

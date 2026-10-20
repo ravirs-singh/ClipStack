@@ -18,11 +18,14 @@ final class PreferencesWindowController: NSWindowController {
     private let shotFolderButton = NSButton(title: "Choose Folder…", target: nil, action: nil)
     private let shotFolderLabel = NSTextField(labelWithString: "")
     private let notchCheck = NSButton(checkboxWithTitle: "Show interactive notch (hover to expand, drop to copy)", target: nil, action: nil)
+    private let notchShotCheck = NSButton(checkboxWithTitle: "Drop the notch down with actions after a screenshot", target: nil, action: nil)
+    private let captureCheck = NSButton(checkboxWithTitle: "Enable ClipStack capture shortcuts (instant, no floating thumbnail)", target: nil, action: nil)
+    private var captureRecorders: [CaptureKind: HotKeyRecorderView] = [:]
     private let notchToastCheck = NSButton(checkboxWithTitle: "Flash the notch when something is copied", target: nil, action: nil)
     private let accessibilityLabel = NSTextField(wrappingLabelWithString: "")
 
     private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 540),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 760),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "ClipStack Preferences"
         window.isReleasedWhenClosed = false
@@ -83,6 +86,23 @@ final class PreferencesWindowController: NSWindowController {
         shotFolderLabel.lineBreakMode = .byTruncatingMiddle
         let folderRow = NSStackView(views: [shotFolderButton, shotFolderLabel]); folderRow.spacing = 8
         notchToastCheck.target = self; notchToastCheck.action = #selector(notchToastChanged)
+        notchShotCheck.target = self; notchShotCheck.action = #selector(notchShotChanged)
+        captureCheck.target = self; captureCheck.action = #selector(captureChanged)
+        var captureRows: [[NSView]] = [[label("Capture:"), captureCheck]]
+        for kind in CaptureKind.allCases {
+            let r = HotKeyRecorderView()
+            r.onChange = { code, mods in Settings.setCaptureHotKey(kind, keyCode: UInt32(code), modifiers: mods) }
+            captureRecorders[kind] = r
+            let row = NSStackView(views: [r, NSTextField(labelWithString: kind.title.replacingOccurrences(of: "Capture ", with: ""))]); row.spacing = 8
+            captureRows.append([NSGridCell.emptyContentView, row])
+        }
+        let sysBtn = NSButton(title: "Open macOS Screenshot Shortcuts…", target: self, action: #selector(openKeyboardShortcuts))
+        sysBtn.controlSize = .small
+        let sysNote = NSTextField(wrappingLabelWithString: "To use ⌘⇧3/4/5 here, first turn those off under System Settings → Keyboard → Keyboard Shortcuts → Screenshots.")
+        sysNote.font = .systemFont(ofSize: NSFont.smallSystemFontSize); sysNote.textColor = .secondaryLabelColor
+        sysNote.preferredMaxLayoutWidth = 360
+        captureRows.append([NSGridCell.emptyContentView, sysNote])
+        captureRows.append([NSGridCell.emptyContentView, sysBtn])
 
         accessibilityLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         accessibilityLabel.textColor = .secondaryLabelColor
@@ -103,8 +123,9 @@ final class PreferencesWindowController: NSWindowController {
             [NSGridCell.emptyContentView, folderRow],
             [label("Notch:"), notchCheck],
             [NSGridCell.emptyContentView, notchToastCheck],
+            [NSGridCell.emptyContentView, notchShotCheck],
             [label("Startup:"), loginCheck],
-        ])
+        ] + captureRows)
         grid.rowSpacing = 10
         grid.columnSpacing = 12
         grid.column(at: 0).xPlacement = .trailing
@@ -143,6 +164,13 @@ final class PreferencesWindowController: NSWindowController {
         shotFolderLabel.stringValue = Settings.screenshotFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         notchToastCheck.state = Settings.notchToasts ? .on : .off
         notchToastCheck.isEnabled = Settings.notchEnabled
+        notchShotCheck.state = Settings.notchScreenshotToast ? .on : .off
+        notchShotCheck.isEnabled = Settings.notchEnabled
+        captureCheck.state = Settings.captureEnabled ? .on : .off
+        for (kind, r) in captureRecorders {
+            if let b = Settings.captureHotKey(kind) { r.setBinding(keyCode: UInt16(b.keyCode), modifiers: b.modifiers) }
+            r.isEnabled = Settings.captureEnabled
+        }
         loginCheck.isEnabled = Bundle.main.bundleURL.pathExtension == "app"
         loginCheck.toolTip = loginCheck.isEnabled ? nil : "Available when running from ClipStack.app"
         accessibilityLabel.stringValue = AXIsProcessTrusted()
@@ -175,6 +203,11 @@ final class PreferencesWindowController: NSWindowController {
         if p.runModal() == .OK, let url = p.url { Settings.screenshotFolder = url; refresh() }
     }
     @objc private func notchChanged() { Settings.notchEnabled = notchCheck.state == .on; refresh() }
+    @objc private func notchShotChanged() { Settings.notchScreenshotToast = notchShotCheck.state == .on }
+    @objc private func captureChanged() { Settings.captureEnabled = captureCheck.state == .on; refresh() }
+    @objc private func openKeyboardShortcuts() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension?Shortcuts") { NSWorkspace.shared.open(url) }
+    }
     @objc private func notchToastChanged() { Settings.notchToasts = notchToastCheck.state == .on }
     @objc private func loginChanged() { Settings.launchAtLogin = loginCheck.state == .on; refresh() }
     @objc private func openAccessibility() {
@@ -190,6 +223,7 @@ final class PreferencesWindowController: NSWindowController {
 /// Click, then press a key combo (must include ⌘, ⌃ or ⌥). Esc cancels.
 final class HotKeyRecorderView: NSView {
     var onChange: ((UInt16, NSEvent.ModifierFlags) -> Void)?
+    var isEnabled = true { didSet { alphaValue = isEnabled ? 1 : 0.4 } }
 
     private var keyCode: UInt16 = 0
     private var modifiers: NSEvent.ModifierFlags = []
@@ -206,6 +240,7 @@ final class HotKeyRecorderView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
         window?.makeFirstResponder(self)
         startRecording()
     }
