@@ -360,9 +360,22 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         right.setContentHuggingPriority(.defaultLow, for: .horizontal)
         previewHeader.widthAnchor.constraint(equalTo: right.widthAnchor, constant: -18).isActive = true
         previewCard.widthAnchor.constraint(equalTo: right.widthAnchor, constant: -18).isActive = true
+        previewCard.bottomAnchor.constraint(equalTo: right.bottomAnchor, constant: -12).isActive = true
+        previewCard.setContentHuggingPriority(.defaultLow, for: .vertical)
 
+        let sidebar = NSVisualEffectView()
+        sidebar.material = .sidebar
+        sidebar.blendingMode = .behindWindow
+        sidebar.state = .active
+        sidebar.translatesAutoresizingMaskIntoConstraints = false
+        left.translatesAutoresizingMaskIntoConstraints = false
+        sidebar.addSubview(left)
+        NSLayoutConstraint.activate([
+            left.topAnchor.constraint(equalTo: sidebar.topAnchor), left.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor),
+            left.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor), left.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+        ])
         let vSep = NSBox(); vSep.boxType = .separator
-        let columns = NSStackView(views: [left, vSep, right])
+        let columns = NSStackView(views: [sidebar, vSep, right])
         columns.orientation = .horizontal
         columns.spacing = 0
         columns.alignment = .top
@@ -398,7 +411,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
             root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             columns.widthAnchor.constraint(equalTo: root.widthAnchor),
             footer.widthAnchor.constraint(equalTo: root.widthAnchor),
-            left.heightAnchor.constraint(equalTo: columns.heightAnchor),
+            sidebar.heightAnchor.constraint(equalTo: columns.heightAnchor),
             right.heightAnchor.constraint(equalTo: columns.heightAnchor),
             vSep.heightAnchor.constraint(equalTo: columns.heightAnchor),
             emptyStack.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
@@ -735,6 +748,9 @@ final class ClipRowView: NSTableCellView {
         text.orientation = .vertical
         text.alignment = .leading
         text.spacing = 2
+        text.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        subtitle.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         pin.image = UI.symbol("pin.fill", size: 10, weight: .semibold)
         pin.contentTintColor = .systemOrange
@@ -760,6 +776,7 @@ final class ClipRowView: NSTableCellView {
         NSLayoutConstraint.activate([
             h.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             h.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            text.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
             h.centerYAnchor.constraint(equalTo: centerYAnchor),
             tile.widthAnchor.constraint(equalToConstant: 38),
             tile.heightAnchor.constraint(equalToConstant: 38),
