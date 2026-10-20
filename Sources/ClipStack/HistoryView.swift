@@ -95,6 +95,18 @@ final class IconTile: NSView {
     }
 }
 
+/// Subtle inset card that keeps its colors right across light/dark.
+final class CardView: NSView {
+    override init(frame: NSRect) { super.init(frame: frame); wantsLayer = true; recolor() }
+    required init?(coder: NSCoder) { fatalError() }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); recolor() }
+    private func recolor() {
+        let dark = effectiveAppearance.name == .darkAqua
+        layer?.backgroundColor = (dark ? NSColor.white.withAlphaComponent(0.06) : NSColor.black.withAlphaComponent(0.035)).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(dark ? 0.5 : 0.35).cgColor
+    }
+}
+
 /// Capsule badge: tinted background, symbol + text.
 final class CapsuleBadge: NSView {
     private let icon = NSImageView()
@@ -150,7 +162,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
     private let metaLabel = UI.label(size: 11, color: .secondaryLabelColor)
     private let actionsPopup = NSPopUpButton()
     private let openButton = NSButton(title: "Open", target: nil, action: nil)
-    private let previewCard = NSView()
+    private let previewCard = CardView()
     private let previewScroll = NSScrollView()
     private let previewText = NSTextView()
     private let previewImage = NSImageView()
@@ -321,7 +333,6 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         previewCard.addSubview(previewScroll)
         previewCard.addSubview(previewImage)
         previewCard.addSubview(colorSwatch)
-        updateCardColors()
 
         imageBottomFull = previewImage.bottomAnchor.constraint(equalTo: previewCard.bottomAnchor, constant: -12)
         imageBottomHalf = previewImage.bottomAnchor.constraint(equalTo: previewCard.centerYAnchor, constant: -6)
@@ -394,14 +405,6 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
             emptyStack.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
         ])
         updateHint()
-    }
-
-    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); updateCardColors() }
-
-    private func updateCardColors() {
-        let dark = view.effectiveAppearance.name == .darkAqua
-        previewCard.layer?.backgroundColor = (dark ? NSColor.white.withAlphaComponent(0.06) : NSColor.black.withAlphaComponent(0.035)).cgColor
-        previewCard.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(dark ? 0.5 : 0.35).cgColor
     }
 
     private func pad(_ v: NSView, _ t: CGFloat, _ l: CGFloat, _ b: CGFloat, _ r: CGFloat) -> NSView {
