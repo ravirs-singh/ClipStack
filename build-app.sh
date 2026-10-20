@@ -9,6 +9,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/ClipStack "$APP/Contents/MacOS/ClipStack"
 cp Info.plist "$APP/Contents/Info.plist"
+mkdir -p "$APP/Contents/Resources"
+iconutil -c icns Assets/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 # Ad-hoc sign so Accessibility permission sticks across rebuilds.
 codesign --force --deep --sign - "$APP"
 
