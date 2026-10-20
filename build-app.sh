@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds ClipStack.app (release) into ./dist
+# Builds ClipStack.app (release) into ./dist and relaunches it.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -11,4 +11,11 @@ cp .build/release/ClipStack "$APP/Contents/MacOS/ClipStack"
 cp Info.plist "$APP/Contents/Info.plist"
 # Ad-hoc sign so Accessibility permission sticks across rebuilds.
 codesign --force --deep --sign - "$APP"
-echo "Built $APP — open it with: open $APP"
+
+# `open` on an already-running app just activates the old process, so quit it first.
+if pgrep -xq ClipStack; then
+    killall ClipStack
+    sleep 0.5
+fi
+open "$APP"
+echo "Built and launched $APP ($(date '+%b %d %H:%M'))"

@@ -33,8 +33,7 @@ macOS 13 Ventura or later, Xcode 15+ or Command Line Tools with Swift 5.9+.
 ## Build & run
 ```bash
 chmod +x build-app.sh
-./build-app.sh
-open dist/ClipStack.app
+./build-app.sh      # builds, quits any running copy, launches the new one
 ```
 For development: `swift run` (menu-bar icon appears; "Launch at login" is only available from the .app bundle).
 
