@@ -225,7 +225,18 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         view.addSubview(root)
         view.addSubview(emptyLabel)
 
+        // Fixed popover size: without this, a tall OCR text or big image makes auto layout inflate the window.
+        previewImage.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        previewImage.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        previewImage.setContentHuggingPriority(.defaultLow, for: .vertical)
+        previewScroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        previewArea.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        preferredContentSize = view.frame.size
+
         NSLayoutConstraint.activate([
+            view.widthAnchor.constraint(equalToConstant: 760),
+            view.heightAnchor.constraint(equalToConstant: 480),
             root.topAnchor.constraint(equalTo: view.topAnchor),
             root.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
