@@ -352,16 +352,21 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
             colorSwatch.heightAnchor.constraint(equalToConstant: 72),
         ])
 
-        let right = NSStackView(views: [previewHeader, previewCard])
-        right.orientation = .vertical
-        right.spacing = 10
-        right.alignment = .leading
-        right.edgeInsets = NSEdgeInsets(top: 14, left: 4, bottom: 12, right: 14)
+        let right = NSView()
         right.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        previewHeader.widthAnchor.constraint(equalTo: right.widthAnchor, constant: -18).isActive = true
-        previewCard.widthAnchor.constraint(equalTo: right.widthAnchor, constant: -18).isActive = true
-        previewCard.bottomAnchor.constraint(equalTo: right.bottomAnchor, constant: -12).isActive = true
-        previewCard.setContentHuggingPriority(.defaultLow, for: .vertical)
+        previewHeader.translatesAutoresizingMaskIntoConstraints = false
+        right.addSubview(previewHeader)
+        right.addSubview(previewCard)
+        NSLayoutConstraint.activate([
+            previewHeader.topAnchor.constraint(equalTo: right.topAnchor, constant: 14),
+            previewHeader.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 14),
+            previewHeader.trailingAnchor.constraint(equalTo: right.trailingAnchor, constant: -14),
+            previewHeader.heightAnchor.constraint(equalToConstant: 24),
+            previewCard.topAnchor.constraint(equalTo: previewHeader.bottomAnchor, constant: 10),
+            previewCard.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 14),
+            previewCard.trailingAnchor.constraint(equalTo: right.trailingAnchor, constant: -14),
+            previewCard.bottomAnchor.constraint(equalTo: right.bottomAnchor, constant: -12),
+        ])
 
         let sidebar = NSVisualEffectView()
         sidebar.material = .sidebar
@@ -400,7 +405,6 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         view.addSubview(emptyStack)
         columns.distribution = .fill
         left.distribution = .fill
-        right.distribution = .fill
 
         NSLayoutConstraint.activate([
             view.widthAnchor.constraint(equalToConstant: Self.size.width),
@@ -775,18 +779,19 @@ final class ClipRowView: NSTableCellView {
         keyBadge.translatesAutoresizingMaskIntoConstraints = false
         keyBox.addSubview(keyBadge)
 
-        let h = NSStackView(views: [tile, text, pin, keyBox])
-        h.orientation = .horizontal
-        h.spacing = 10
-        h.alignment = .centerY
-        h.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(h)
+        text.translatesAutoresizingMaskIntoConstraints = false
+        [tile, text, pin, keyBox].forEach { addSubview($0) }
 
         NSLayoutConstraint.activate([
-            h.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            h.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            text.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
-            h.centerYAnchor.constraint(equalTo: centerYAnchor),
+            tile.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            tile.centerYAnchor.constraint(equalTo: centerYAnchor),
+            keyBox.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            keyBox.centerYAnchor.constraint(equalTo: centerYAnchor),
+            pin.trailingAnchor.constraint(equalTo: keyBox.leadingAnchor, constant: -8),
+            pin.centerYAnchor.constraint(equalTo: centerYAnchor),
+            text.leadingAnchor.constraint(equalTo: tile.trailingAnchor, constant: 10),
+            text.trailingAnchor.constraint(equalTo: pin.leadingAnchor, constant: -8),
+            text.centerYAnchor.constraint(equalTo: centerYAnchor),
             tile.widthAnchor.constraint(equalToConstant: 38),
             tile.heightAnchor.constraint(equalToConstant: 38),
             pin.widthAnchor.constraint(equalToConstant: 12),
