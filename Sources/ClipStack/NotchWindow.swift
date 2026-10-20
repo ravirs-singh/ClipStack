@@ -122,8 +122,8 @@ final class NotchController {
         let target = frame(for: new)
         if animated {
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.28
-                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
+                ctx.duration = 0.34
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.3, 1.25, 0.35, 1.0)  // slight spring
                 panel.animator().setFrame(target, display: true)
             }
         } else {
@@ -239,6 +239,7 @@ final class NotchView: NSView {
     var onDrop: ((NSPasteboard) -> Bool)?
 
     private let shape = CAShapeLayer()
+    private let rim = CAShapeLayer()
     private let toastIcon = NSImageView()
     private let toastLabel = NSTextField(labelWithString: "")
     private let toastStack = NSStackView()
@@ -258,8 +259,15 @@ final class NotchView: NSView {
         wantsLayer = true
         layer?.addSublayer(shape)
         shape.fillColor = NSColor.black.cgColor
+        rim.fillColor = nil
+        rim.strokeColor = NSColor.white.withAlphaComponent(0.09).cgColor
+        rim.lineWidth = 1
+        layer?.addSublayer(rim)
 
         toastIcon.contentTintColor = .white
+        toastIcon.wantsLayer = true
+        toastIcon.layer?.cornerRadius = 9
+        toastIcon.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
         toastIcon.imageScaling = .scaleProportionallyUpOrDown
         toastLabel.textColor = .white
         toastLabel.font = .systemFont(ofSize: 12, weight: .medium)
@@ -272,8 +280,9 @@ final class NotchView: NSView {
         toastStack.isHidden = true
         addSubview(toastStack)
 
-        header.textColor = NSColor.white.withAlphaComponent(0.7)
-        header.font = .systemFont(ofSize: 11, weight: .semibold)
+        header.textColor = NSColor.white.withAlphaComponent(0.5)
+        header.font = .systemFont(ofSize: 10, weight: .semibold)
+        header.stringValue = "RECENT"
         historyButton.bezelStyle = .inline
         historyButton.controlSize = .small
         historyButton.target = self
@@ -324,6 +333,9 @@ final class NotchView: NSView {
         super.layout()
         shape.frame = bounds
         shape.path = notchPath().toCGPath()
+        rim.frame = bounds
+        rim.path = shape.path
+        rim.isHidden = mode == .collapsed
         shape.fillColor = (dragHighlight ? NSColor(white: 0.12, alpha: 1) : .black).cgColor
 
         let padX: CGFloat = 16
@@ -349,7 +361,7 @@ final class NotchView: NSView {
             toastStack.isHidden = false
             let w = bounds.width - padX * 2
             toastStack.frame = NSRect(x: padX, y: (bounds.height - 18) / 2, width: w, height: 18)
-            toastIcon.frame.size = NSSize(width: 16, height: 16)
+            toastIcon.frame.size = NSSize(width: 18, height: 18)
         case .expanded:
             toastStack.isHidden = true
             shotViews.forEach { $0.isHidden = true }
@@ -471,8 +483,11 @@ final class ChipView: NSView, NSDraggingSource {
         self.item = item
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 1, alpha: 0.12).cgColor
-        layer?.cornerRadius = 12
+        layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor
 
         let type = item.smartType
         let icon = NSImageView()
@@ -525,8 +540,8 @@ final class ChipView: NSView, NSDraggingSource {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func mouseEntered(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.22).cgColor }
-    override func mouseExited(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.12).cgColor }
+    override func mouseEntered(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.2).cgColor; layer?.borderColor = NSColor(white: 1, alpha: 0.18).cgColor }
+    override func mouseExited(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor; layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor }
     override func mouseDown(with event: NSEvent) { dragStart = event.locationInWindow }
     override func mouseUp(with event: NSEvent) { if dragStart != nil { onTap?() }; dragStart = nil }
 
