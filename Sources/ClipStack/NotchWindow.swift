@@ -168,11 +168,14 @@ final class NotchController {
     }
 
     private func showToast(for item: ClipItem) {
-        guard Settings.notchEnabled, Settings.notchToasts, state != .expanded else {
-            if state == .expanded { notchView.items = Array(store.filtered("").prefix(6)) }
-            return
+        if state == .expanded { notchView.items = Array(store.filtered("").prefix(6)); return }
+        guard Settings.notchEnabled else { return }
+        // Screenshots never flash the notch unless the screenshot drop-down is explicitly on.
+        if item.isScreenshot {
+            guard Settings.notchScreenshotToast else { return }
+        } else {
+            guard Settings.notchToasts else { return }
         }
-        if item.isScreenshot && !Settings.notchScreenshotToast { return }
         notchView.toastItem = item
         if item.isScreenshot {
             setState(.shot, animated: true)
