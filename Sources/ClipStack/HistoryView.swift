@@ -492,6 +492,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
     @objc private func filterChanged() { reload() }
 
     private func reload() {
+        guard isViewLoaded else { return }   // store changes can arrive before the popover is ever shown
         let previousID = selected?.id
         results = store.filtered(searchField.stringValue, filter: currentFilter)
         tableView.reloadData()
