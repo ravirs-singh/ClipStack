@@ -228,14 +228,16 @@ final class NowPlayingMonitor {
         let js: String
         switch command {
         case "playpause":
-            js = "(function(){var v=document.querySelector('video');if(!v)return;v.paused?v.play():v.pause();})()"
+            // Prefer the site's own button (YouTube Music / YouTube / SoundCloud); fall back to the <video> element.
+            js = "(function(){var b=document.querySelector('#play-pause-button, tp-yt-paper-icon-button#play-pause-button, .ytp-play-button, .playControl');if(b){b.click();return 'btn';}var v=document.querySelector('video');if(!v)return 'none';v.paused?v.play():v.pause();return 'video';})()"
         case "next track":
             js = "(function(){var b=document.querySelector('.next-button, tp-yt-paper-icon-button.next-button, .ytp-next-button, .skipControl__next');if(b)b.click();})()"
         default:
             js = "(function(){var b=document.querySelector('.previous-button, tp-yt-paper-icon-button.previous-button, .ytp-prev-button, .skipControl__previous');if(b)b.click();else{var v=document.querySelector('video');if(v)v.currentTime=0;}})()"
         }
         let esc = js.replacingOccurrences(of: "\"", with: "\\\"")
-        _ = run("tell application \"\(src.rawValue)\" to execute tab \(parts[1]) of window \(parts[0]) javascript \"\(esc)\"")
+        let out = run("tell application \"\(src.rawValue)\" to execute tab \(parts[1]) of window \(parts[0]) javascript \"\(esc)\"")
+        NSLog("ClipStack: \(command) → \(src.rawValue) tab \(ref): \(out ?? "error")")
     }
 
     private func fetchArtwork(for i: NowPlayingInfo, key: String) {

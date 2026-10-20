@@ -57,6 +57,7 @@ final class NotchController {
         panel.ignoresMouseEvents = false
         panel.acceptsMouseMovedEvents = true
         panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
         panel.isMovableByWindowBackground = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.contentView = notchView
@@ -300,7 +301,7 @@ final class NotchView: NSView {
     private let toastStack = NSStackView()
     private let chipsStack = NSStackView()
     private let header = NSTextField(labelWithString: "Recent clips")
-    private let historyButton = NSButton(title: "History", target: nil, action: nil)
+    private let historyButton = FirstClickButton(title: "History", target: nil, action: nil)
     private let dropHint = NSTextField(labelWithString: "Drop files or text here to copy")
     private var dragHighlight = false { didSet { needsDisplay = true } }
     private let shotThumb = NSImageView()
@@ -318,9 +319,9 @@ final class NotchView: NSView {
     private let cardProgress = CALayer()
     private let cardTrack = CALayer()
     private let cardTime = NSTextField(labelWithString: "")
-    private let prevButton = NSButton()
-    private let playButton = NSButton()
-    private let nextButton = NSButton()
+    private let prevButton = FirstClickButton()
+    private let playButton = FirstClickButton()
+    private let nextButton = FirstClickButton()
     private var progressPosition: TimeInterval = 0
     private var musicViews: [NSView] { [cardArt, cardTitle, cardArtist, cardTime, prevButton, playButton, nextButton] }
 
@@ -380,7 +381,7 @@ final class NotchView: NSView {
         shotButtons.spacing = 6
         for (title, sym, action) in [("Copy", "doc.on.doc", ShotAction.copy), ("Text", "text.viewfinder", .text),
                                      ("Reveal", "folder", .reveal), ("Trash", "trash", .trash)] {
-            let b = NSButton(title: title, image: NSImage(systemSymbolName: sym, accessibilityDescription: title)!, target: self, action: #selector(shotButtonTapped(_:)))
+            let b = FirstClickButton(title: title, image: NSImage(systemSymbolName: sym, accessibilityDescription: title)!, target: self, action: #selector(shotButtonTapped(_:)))
             b.bezelStyle = .inline
             b.controlSize = .small
             b.imagePosition = .imageLeading
@@ -434,6 +435,7 @@ final class NotchView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     // MARK: Layout & drawing
 
@@ -679,13 +681,22 @@ final class NotchView: NSView {
 }
 
 /// Plain container with top-left origin, matching NotchView.
-final class FlippedView: NSView { override var isFlipped: Bool { true } }
+final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// Button that reacts to the very first click even when its panel isn't key.
+final class FirstClickButton: NSButton {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
 
 // MARK: - Chip
 
 /// A tappable card showing one recent clip.
 final class ChipView: NSView, NSDraggingSource {
     var onTap: (() -> Void)?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     private let item: ClipItem
     private var dragStart: NSPoint?
 
