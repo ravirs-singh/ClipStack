@@ -134,6 +134,7 @@ final class NowPlayingMonitor {
 
     private var browserArtURL: String?
     private var lastBrowserTitle = ""
+    private var lastDiagAt = Date.distantPast
 
     private func queryMusic() -> NowPlayingInfo? {
         let script = """
@@ -166,6 +167,9 @@ final class NowPlayingMonitor {
         tell application "\(src.rawValue)"
             set best to ""
             set fallback to ""
+            set matched to 0
+            set lastErr to ""
+            set firstRaw to ""
             set wi to 0
             repeat with w in windows
                 set wi to wi + 1
@@ -174,8 +178,10 @@ final class NowPlayingMonitor {
                     set ti to ti + 1
                     set u to URL of t
                     if u contains "music.youtube.com" or u contains "youtube.com/watch" or u contains "soundcloud.com" then
+                        set matched to matched + 1
                         try
                             set r to execute t javascript "\(js)"
+                            if firstRaw is "" then set firstRaw to (r as string)
                             if r is not "" and r is not missing value then
                                 set r to (wi as string) & "," & (ti as string) & "|" & r
                                 if r contains "|playing|" then
@@ -185,16 +191,26 @@ final class NowPlayingMonitor {
                                     set fallback to r
                                 end if
                             end if
+                        on error e
+                            set lastErr to e
                         end try
                     end if
                 end repeat
                 if best is not "" then exit repeat
             end repeat
             if best is not "" then return best
-            return fallback
+            if fallback is not "" then return fallback
+            return "DIAG|" & matched & "|" & lastErr & "|" & firstRaw
         end tell
         """
         guard let out = run(script), !out.isEmpty else { return nil }
+        if out.hasPrefix("DIAG|") {
+            if Date().timeIntervalSince(lastDiagAt) > 15 {
+                NSLog("ClipStack: \(src.rawValue) scan found nothing — \(out)")
+                lastDiagAt = Date()
+            }
+            return nil
+        }
         let f = out.components(separatedBy: "|")
         guard f.count >= 8 else { NSLog("ClipStack: unexpected browser reply: \(out)"); return nil }
         if f[2] != lastBrowserTitle { NSLog("ClipStack: now playing in \(src.rawValue): \(f[2]) — \(f[1])"); lastBrowserTitle = f[2] }
