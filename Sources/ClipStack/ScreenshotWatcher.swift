@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import Vision
 
 /// Watches for new screenshots via Spotlight (kMDItemIsScreenCapture), optionally organizes them
@@ -86,7 +87,7 @@ final class ScreenshotWatcher {
                let created = attrs[.creationDate] as? Date, Date().timeIntervalSince(created) > 10 { continue }
             guard !seen.contains(url.path) else { continue }
             seen.insert(url.path)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.ingest(url) }
+            ingest(url)
         }
     }
 
@@ -108,23 +109,60 @@ final class ScreenshotWatcher {
                   !(p as NSString).lastPathComponent.hasPrefix(".") else { continue }
             seen.insert(p)
             // Spotlight can fire while the file is still being finalized.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.ingest(URL(fileURLWithPath: p)) }
+            ingest(URL(fileURLWithPath: p))
         }
     }
 
     // MARK: Ingest
 
+    private let workQueue = DispatchQueue(label: "ClipStack.screenshots", qos: .userInitiated)
+
     private func ingest(_ original: URL) {
-        guard FileManager.default.fileExists(atPath: original.path) else { return }
-        var url = original
-        let app = frontmostAppName()
-
-        if Settings.screenshotOrganize {
-            if let moved = organize(url, appName: app) { url = moved; seen.insert(moved.path) }
+        let app = frontmostAppName()          // read on main, while the capturing app is still frontmost
+        let organize = Settings.screenshotOrganize
+        let ocr = Settings.screenshotOCR
+        let thumbDir = store.imagesDir
+        workQueue.async { [weak self] in
+            guard let self, Self.waitUntilStable(original) else { return }
+            var url = original
+            if organize, let moved = self.organize(url, appName: app) { url = moved }
+            guard let thumbPath = Self.makeThumbnail(of: url, maxPixel: 1000, into: thumbDir) else { return }
+            DispatchQueue.main.async {
+                if url != original { self.seen.insert(url.path) }
+                let item = self.store.addScreenshot(source: url, thumbPath: thumbPath, appName: app)
+                if ocr { self.runOCR(for: item, url: url) }
+            }
         }
+    }
 
-        guard let item = store.addScreenshot(at: url, appName: app) else { return }
-        if Settings.screenshotOCR { runOCR(for: item, url: url) }
+    /// The screenshot file appears before it's fully written; poll until its size stops changing.
+    private static func waitUntilStable(_ url: URL, timeout: TimeInterval = 3) -> Bool {
+        let fm = FileManager.default
+        var last: UInt64 = 0
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            guard fm.fileExists(atPath: url.path) else { usleep(50_000); continue }
+            let size = (try? fm.attributesOfItem(atPath: url.path)[.size] as? UInt64) ?? 0
+            if size > 0 && size == last { return true }
+            last = size
+            usleep(80_000)
+        }
+        return fm.fileExists(atPath: url.path)
+    }
+
+    /// Fast downscale with ImageIO (no full decode on the main thread). Returns the written PNG path.
+    private static func makeThumbnail(of url: URL, maxPixel: Int, into dir: URL) -> String? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        let out = dir.appendingPathComponent(UUID().uuidString + ".png")
+        guard let dest = CGImageDestinationCreateWithURL(out as CFURL, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, nil)
+        return CGImageDestinationFinalize(dest) ? out.path : nil
     }
 
     private func frontmostAppName() -> String? {

@@ -14,7 +14,7 @@ final class ClipStore {
 
     private let dir: URL
     private let dbURL: URL
-    private let imagesDir: URL
+    let imagesDir: URL
     private var settingsObserver: NSObjectProtocol?
 
     init() {
@@ -75,17 +75,11 @@ final class ClipStore {
         trim(); save(); announce(items[0])
     }
 
-    /// Records a screenshot file: stores a downscaled thumbnail, keeps a reference to the original.
+    /// Records a screenshot file: `thumbPath` is a pre-made downscaled copy, `source` the original on disk.
     @discardableResult
-    func addScreenshot(at url: URL, appName: String?) -> ClipItem? {
-        guard let img = NSImage(contentsOf: url) else { return nil }
-        let thumb = Self.downscale(img, maxSide: 1000)
-        guard let tiff = thumb.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]) else { return nil }
-        let path = imagesDir.appendingPathComponent(UUID().uuidString + ".png")
-        do { try png.write(to: path) } catch { return nil }
-        var item = ClipItem(imagePath: path.path)
-        item.sourcePath = url.path
+    func addScreenshot(source: URL, thumbPath: String, appName: String?) -> ClipItem {
+        var item = ClipItem(imagePath: thumbPath)
+        item.sourcePath = source.path
         item.appName = appName
         items.insert(item, at: 0)
         trim(); save(); announce(items[0])
@@ -102,20 +96,6 @@ final class ClipStore {
     func trashScreenshot(_ item: ClipItem) {
         if let url = item.sourceURL { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
         remove(item)
-    }
-
-    private static func downscale(_ img: NSImage, maxSide: CGFloat) -> NSImage {
-        guard let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return img }
-        let w = CGFloat(cg.width), h = CGFloat(cg.height)
-        let scale = min(1, maxSide / max(w, h))
-        guard scale < 1 else { return img }
-        let size = NSSize(width: w * scale, height: h * scale)
-        let out = NSImage(size: size)
-        out.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
-        img.draw(in: NSRect(origin: .zero, size: size))
-        out.unlockFocus()
-        return out
     }
 
     func togglePin(_ item: ClipItem) {
