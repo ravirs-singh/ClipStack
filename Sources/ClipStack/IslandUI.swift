@@ -4,7 +4,7 @@ import AppKit
 
 enum Theme {
     static let text = NSColor.white
-    static let label = NSColor(white: 1, alpha: 0.62)
+    static let secondary = NSColor(white: 1, alpha: 0.62)
     static let dim = NSColor(white: 1, alpha: 0.38)
     static let accent = NSColor(red: 0.40, green: 0.55, blue: 1.0, alpha: 1)
 
@@ -15,7 +15,7 @@ enum Theme {
         return base
     }
 
-    static func label(_ text: String = "", size: CGFloat = 12, weight: NSFont.Weight = .regular, color: NSColor = Theme.label) -> NSTextField {
+    static func label(_ text: String = "", size: CGFloat = 12, weight: NSFont.Weight = .regular, color: NSColor = Theme.secondary) -> NSTextField {
         let l = NSTextField(labelWithString: text)
         l.font = font(size, weight); l.textColor = color; l.lineBreakMode = .byTruncatingTail
         return l
@@ -326,14 +326,14 @@ final class IslandContentView: NSView {
 
     // Summary card helper: small label top-left, big numeral bottom-left, optional circle button top-right.
     private func summary(_ card: GlassCard, title: String, subtitle: String? = nil, big: String, bigSuffix: String? = nil, caption: String? = nil, button: NSView? = nil, dot: NSColor? = nil) {
-        let t = Theme.label(title, size: 13, color: Theme.label); card.addSubview(t)
+        let t = Theme.label(title, size: 13, color: Theme.secondary); card.addSubview(t)
         var s: NSTextField?
-        if let subtitle { let l = Theme.label(subtitle, size: 13, color: Theme.label); card.addSubview(l); s = l }
+        if let subtitle { let l = Theme.label(subtitle, size: 13, color: Theme.secondary); card.addSubview(l); s = l }
         let b = Theme.label(big, size: 64, weight: .light, color: .white); card.addSubview(b)
         var suf: NSTextField?
         if let bigSuffix { let l = Theme.label(bigSuffix, size: 24, weight: .light, color: Theme.dim); card.addSubview(l); suf = l }
         var cap: NSTextField?
-        if let caption { let l = Theme.label(caption, size: 13, color: Theme.label); card.addSubview(l); cap = l }
+        if let caption { let l = Theme.label(caption, size: 13, color: Theme.secondary); card.addSubview(l); cap = l }
         var dv: NSView?
         if let dot { let v = NSView(); v.wantsLayer = true; v.layer?.cornerRadius = 4; v.layer?.backgroundColor = dot.cgColor; card.addSubview(v); dv = v }
         if let button { card.addSubview(button) }
@@ -359,7 +359,7 @@ final class IslandContentView: NSView {
         art.layer?.backgroundColor = NSColor(white: 1, alpha: 0.1).cgColor; art.imageScaling = .scaleProportionallyUpOrDown
         art.image = d.nowPlayingInfo?.artwork
         let title = Theme.label(d.nowPlayingInfo?.title ?? "Nothing playing", size: 16, weight: .semibold, color: .white)
-        let sub = Theme.label(d.nowPlayingInfo.map { "\($0.artist) · \($0.source.rawValue == "Google Chrome" ? "YouTube" : $0.source.rawValue)" } ?? "Spotify, Music or YouTube Music", size: 12, color: Theme.label)
+        let sub = Theme.label(d.nowPlayingInfo.map { "\($0.artist) · \($0.source.rawValue == "Google Chrome" ? "YouTube" : $0.source.rawValue)" } ?? "Spotify, Music or YouTube Music", size: 12, color: Theme.secondary)
         let track = NSView(); track.wantsLayer = true; track.layer?.backgroundColor = NSColor(white: 1, alpha: 0.18).cgColor; track.layer?.cornerRadius = 1.5
         let fill = NSView(); fill.wantsLayer = true; fill.layer?.backgroundColor = NSColor.white.cgColor; fill.layer?.cornerRadius = 1.5; track.addSubview(fill)
         let prev = CircleButton(symbol: "backward.fill", size: 36, filled: false, target: self, action: #selector(musicPrev))
@@ -573,7 +573,7 @@ final class IslandContentView: NSView {
         // right: mode pills + end time + progress line + session dots
         let pomo = PillButton("Pomodoro", target: self, action: #selector(modePomodoro)); pomo.isOn = pomodoroMode
         let plain = PillButton("Timer", target: self, action: #selector(modeTimer)); plain.isOn = !pomodoroMode
-        let endLabel = Theme.label("Would end at", size: 13, color: Theme.label)
+        let endLabel = Theme.label("Would end at", size: 13, color: Theme.secondary)
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let endTime = Theme.label(f.string(from: Date().addingTimeInterval(remaining)), size: 44, weight: .light, color: .white)
         let line = NSView(); line.wantsLayer = true; line.layer?.backgroundColor = NSColor(white: 1, alpha: 0.2).cgColor; line.layer?.cornerRadius = 1
@@ -589,7 +589,7 @@ final class IslandContentView: NSView {
             for mins in [5, 10, 15, 25, 45, 60] { let b = PillButton("\(mins) min", target: self, action: #selector(presetTapped(_:))); b.tag = mins; right.addSubview(b); presets.append(b) }
         }
         var dots: [NSView] = []
-        let bottom = Theme.label(pomodoroMode ? "Focus · session \(min(4, d.pomodoroSessions + 1)) / 4" : (running ? "Counting down" : "Pick a length"), size: 13, color: Theme.label)
+        let bottom = Theme.label(pomodoroMode ? "Focus · session \(min(4, d.pomodoroSessions + 1)) / 4" : (running ? "Counting down" : "Pick a length"), size: 13, color: Theme.secondary)
         right.addSubview(bottom)
         if pomodoroMode {
             for i in 0..<4 { let v = NSView(); v.wantsLayer = true; v.layer?.cornerRadius = 5; v.layer?.borderWidth = 1.5
