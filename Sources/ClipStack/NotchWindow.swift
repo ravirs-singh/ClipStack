@@ -24,7 +24,7 @@ final class NotchController {
     private var hovering = false
     private var observers: [NSObjectProtocol] = []
 
-    private let expandedSize = NSSize(width: 920, height: 300)
+    private let expandedSize = NSSize(width: 720, height: 236)
     private let musicExtra: CGFloat = 84          // extra height for the player card when music is playing
     private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
     private let nowPlaying = NowPlayingMonitor()
@@ -1086,7 +1086,7 @@ final class NotchView: NSView {
 
     /// Flat top (hugs the screen edge), rounded bottom corners, small concave "ears" at the top like the real notch.
     private func notchPath(in b: NSRect) -> NSBezierPath {
-        let r: CGFloat = mode == .collapsed ? (hasRealNotch ? 10 : 12) : (mode == .expanded ? 36 : 22)
+        let r: CGFloat = mode == .collapsed ? (hasRealNotch ? 10 : 12) : (mode == .expanded ? 30 : 22)
         let ear: CGFloat = hasRealNotch ? 6 : 0
         let p = NSBezierPath()
         p.move(to: NSPoint(x: b.minX, y: b.minY))
