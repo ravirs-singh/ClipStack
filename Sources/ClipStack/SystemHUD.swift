@@ -34,6 +34,7 @@ final class SystemHUD {
 
     private func applyEnabled() {
         stop()
+        Self.setSystemOverlay(hidden: Settings.hudEnabled && Settings.hudReplaceSystem)
         guard Settings.hudEnabled else { return }
         armed = false
         setupVolume()
@@ -53,6 +54,35 @@ final class SystemHUD {
         }
         listenerBlock = nil
     }
+
+    // MARK: Apple's overlay (OSDUIHelper)
+
+    private static let osdLabel = "com.apple.OSDUIHelper"
+    private static let osdPlist = "/System/Library/LaunchAgents/com.apple.OSDUIHelper.plist"
+    private static var overlayHidden = false
+
+    /// Boots Apple's HUD agent out of the user session (no admin needed) or brings it back.
+    static func setSystemOverlay(hidden: Bool) {
+        guard hidden != overlayHidden else { return }
+        overlayHidden = hidden
+        let uid = getuid()
+        let args = hidden ? ["bootout", "gui/\(uid)/\(osdLabel)"] : ["bootstrap", "gui/\(uid)", osdPlist]
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.arguments = args
+        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+        try? p.run(); p.waitUntilExit()
+        if !hidden {
+            let k = Process(); k.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            k.arguments = ["kickstart", "gui/\(uid)/\(osdLabel)"]
+            k.standardOutput = FileHandle.nullDevice; k.standardError = FileHandle.nullDevice
+            try? k.run(); k.waitUntilExit()
+        }
+        NSLog("ClipStack: system HUD overlay \(hidden ? "hidden" : "restored") (launchctl exit \(p.terminationStatus))")
+    }
+
+    /// Always restore Apple's overlay when we go away.
+    static func restoreSystemOverlay() { setSystemOverlay(hidden: false) }
 
     // MARK: Volume (CoreAudio)
 

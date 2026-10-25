@@ -292,6 +292,7 @@ final class NotchPane: PreferencePane {
     private lazy var calCheck = checkbox("Show next calendar event and today's reminders", #selector(changed))
     private lazy var weatherCheck = checkbox("Show the weather (uses your location)", #selector(changed))
     private lazy var hudCheck = checkbox("Show volume, brightness and Caps Lock changes in the notch", #selector(changed))
+    private lazy var hudReplaceCheck = checkbox("Hide Apple's own overlay while ClipStack is running", #selector(changed))
     private let glowPopup = NSPopUpButton()
 
     override func build() {
@@ -306,7 +307,8 @@ final class NotchPane: PreferencePane {
         note("macOS will ask for Calendar and Reminders access the first time.")
         row("Weather:", weatherCheck)
         row("HUD:", hudCheck)
-        note("Apple's own overlay still appears; this adds a matching indicator in the notch.")
+        row(hudReplaceCheck)
+        note("Unloads macOS's overlay helper for your session so only the notch shows volume and brightness. Restored automatically when ClipStack quits or this is turned off.")
         gap()
         for t in ["Off", "Subtle", "Vivid"] { glowPopup.addItem(withTitle: t) }
         glowPopup.target = self; glowPopup.action = #selector(glowChanged)
@@ -327,6 +329,8 @@ final class NotchPane: PreferencePane {
         calCheck.state = Settings.calendarEnabled ? .on : .off
         weatherCheck.state = Settings.weatherEnabled ? .on : .off
         hudCheck.state = Settings.hudEnabled ? .on : .off
+        hudReplaceCheck.state = Settings.hudReplaceSystem ? .on : .off
+        hudReplaceCheck.isEnabled = Settings.notchEnabled && Settings.hudEnabled
         glowPopup.selectItem(at: Settings.notchGlow)
         [calCheck, weatherCheck, hudCheck, glowPopup].forEach { $0.isEnabled = Settings.notchEnabled }
     }
@@ -339,6 +343,7 @@ final class NotchPane: PreferencePane {
         Settings.calendarEnabled = calCheck.state == .on
         Settings.weatherEnabled = weatherCheck.state == .on
         Settings.hudEnabled = hudCheck.state == .on
+        Settings.hudReplaceSystem = hudReplaceCheck.state == .on
     }
     @objc private func glowChanged() { Settings.notchGlow = glowPopup.indexOfSelectedItem }
 }

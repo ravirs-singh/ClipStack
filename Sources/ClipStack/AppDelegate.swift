@@ -48,6 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        SystemHUD.restoreSystemOverlay()
+    }
+
     @objc private func statusClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             showStatusMenu()
