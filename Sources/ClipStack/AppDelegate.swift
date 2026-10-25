@@ -13,6 +13,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)   // menu-bar only, no Dock icon
+        // An earlier build could unload macOS's volume/brightness overlay; make sure it's back.
+        let restore = Process(); restore.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        restore.arguments = ["bootstrap", "gui/\(getuid())", "/System/Library/LaunchAgents/com.apple.OSDUIHelper.plist"]
+        restore.standardOutput = FileHandle.nullDevice; restore.standardError = FileHandle.nullDevice
+        try? restore.run()
         quitOtherInstances()
 
         monitor = ClipboardMonitor(store: store)
@@ -46,10 +51,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         where app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             app.terminate()
         }
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        SystemHUD.restoreSystemOverlay()
     }
 
     @objc private func statusClicked() {

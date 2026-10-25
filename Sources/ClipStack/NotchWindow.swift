@@ -18,7 +18,7 @@ final class NotchController {
     private var hasRealNotch = false
     private var notchCenterX: CGFloat = 0
 
-    private enum State { case collapsed, toast, shot, expanded, timerDone, hud, agentAsk }
+    private enum State { case collapsed, toast, shot, expanded, timerDone, agentAsk }
     private var state: State = .collapsed
     private var collapseTimer: Timer?
     private var hovering = false
@@ -32,9 +32,7 @@ final class NotchController {
     let timer = NotchTimer()
     let agents = AgentMonitor()
     let calendar = CalendarMonitor()
-    let hud = SystemHUD()
     let weather = WeatherMonitor()
-    private var hudTimer: Timer?
     private(set) var pomodoroSessions = 0
     private var pomodoroRunning = false
     private var positionTimer: Timer?
@@ -132,9 +130,6 @@ final class NotchController {
         observers.append(NotificationCenter.default.addObserver(forName: WeatherMonitor.changed, object: nil, queue: .main) { [weak self] _ in
             self?.notchView.needsLayout = true
         })
-        observers.append(NotificationCenter.default.addObserver(forName: SystemHUD.changed, object: nil, queue: .main) { [weak self] n in
-            if let e = n.userInfo?["event"] as? SystemHUD.Event { self?.showHUD(e) }
-        })
         observers.append(NotificationCenter.default.addObserver(forName: ShelfStore.changed, object: nil, queue: .main) { [weak self] _ in
             self?.notchView.rebuildShelf()
         })
@@ -190,7 +185,6 @@ final class NotchController {
             size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0) + left + right, height: notchSize.height)
         case .toast:     size = NSSize(width: max(notchSize.width + 200, 420), height: notchSize.height + 42)
         case .timerDone: size = NSSize(width: max(notchSize.width + 260, 420), height: notchSize.height + 46)
-        case .hud:       size = NSSize(width: max(notchSize.width + 160, 380), height: notchSize.height + 40)
         case .agentAsk:  size = NSSize(width: max(notchSize.width + 260, 540), height: notchSize.height + 92)
         case .shot:      size = NSSize(width: max(shotToastSize.width, notchSize.width + 200), height: notchSize.height + shotToastSize.height)
         case .expanded:  size = expandedSize
@@ -208,7 +202,6 @@ final class NotchController {
             case .toast: return .toast
             case .shot: return .shot
             case .timerDone: return .timerDone
-            case .hud: return .hud
             case .agentAsk: return .agentAsk
             case .expanded: return .expanded
             }
@@ -281,7 +274,7 @@ final class NotchController {
         scheduleCollapse(after: 8)
     }
 
-    // MARK: Agents / calendar / HUD
+    // MARK: Agents / calendar
 
     private func islandRefresh() { if state == .expanded { notchView.island.refresh() } }
 
@@ -305,17 +298,6 @@ final class NotchController {
         notchView.needsLayout = true
         islandRefresh()
         if state == .collapsed { setState(.collapsed, animated: true) }
-    }
-
-    private func showHUD(_ e: SystemHUD.Event) {
-        guard Settings.notchEnabled, state == .collapsed || state == .hud || state == .toast else { return }
-        notchView.hudEvent = e
-        hudTimer?.invalidate()
-        setState(.hud, animated: state != .hud)
-        hudTimer = Timer.scheduledTimer(withTimeInterval: 1.3, repeats: false) { [weak self] _ in
-            guard let self, !self.hovering else { return }
-            self.collapse()
-        }
     }
 
     // MARK: Now playing
@@ -404,12 +386,11 @@ final class NotchController {
 // MARK: - View
 
 final class NotchView: NSView {
-    enum Mode { case collapsed, toast, shot, expanded, timerDone, hud, agentAsk }
+    enum Mode { case collapsed, toast, shot, expanded, timerDone, agentAsk }
     enum Tab: Int { case clips, shelf, timer, agents, upNext, prompter }
     weak var agents: AgentMonitor?
     weak var calendar: CalendarMonitor?
     weak var weather: WeatherMonitor?
-    var hudEvent: SystemHUD.Event? { didSet { needsLayout = true } }
     var onAgentDecision: ((AgentMonitor.Permission, Bool) -> Void)?
     var onJoin: ((CalendarMonitor.Item) -> Void)?
     var selectedTab: Tab = .clips { didSet { needsLayout = true } }
@@ -516,11 +497,6 @@ final class NotchView: NSView {
     private let prompterHint = NSTextField(labelWithString: "Scrolls your most recent copied text")
     private var prompterTimer: Timer?
     private var prompterRate: CGFloat = 1
-    // HUD
-    private let hudIcon = NSImageView()
-    private let hudBar = NSView()
-    private let hudFill = NSView()
-    private let hudLabel = NSTextField(labelWithString: "")
     private let weatherLabel = NSTextField(labelWithString: "")
     private let glow = CAShapeLayer()
     let island = IslandContentView()
@@ -704,12 +680,6 @@ final class NotchView: NSView {
         for b in [prompterPlay, prompterSpeed] { b.bezelStyle = .inline; b.controlSize = .small; b.contentTintColor = .white; b.target = self }
         prompterPlay.action = #selector(prompterPlayTapped); prompterSpeed.action = #selector(prompterSpeedTapped)
         prompterHint.font = .systemFont(ofSize: 10); prompterHint.textColor = NSColor.white.withAlphaComponent(0.45)
-        // hud
-        hudIcon.contentTintColor = .white
-        hudBar.wantsLayer = true; hudBar.layer?.cornerRadius = 3; hudBar.layer?.backgroundColor = NSColor(white: 1, alpha: 0.18).cgColor
-        hudFill.wantsLayer = true; hudFill.layer?.cornerRadius = 3; hudFill.layer?.backgroundColor = NSColor.white.cgColor
-        hudBar.addSubview(hudFill)
-        hudLabel.font = .systemFont(ofSize: 12, weight: .semibold); hudLabel.textColor = .white
         weatherLabel.font = .systemFont(ofSize: 11, weight: .medium); weatherLabel.textColor = NSColor.white.withAlphaComponent(0.7)
         // glow ring under the rim
         glow.fillColor = nil; glow.lineWidth = 2; glow.strokeColor = NSColor.clear.cgColor
@@ -718,7 +688,7 @@ final class NotchView: NSView {
         island.isHidden = true
         content.addSubview(island)
         ([agentCard, agentList, hintAgent, hintAgentLabel, upNextList, hintCal, hintCalLabel, prompterScroll, prompterPlay, prompterSpeed, prompterHint,
-          hudIcon, hudBar, hudLabel, weatherLabel]).forEach { $0.isHidden = true; content.addSubview($0) }
+          weatherLabel]).forEach { $0.isHidden = true; content.addSubview($0) }
         cardTrack.isHidden = true; cardProgress.isHidden = true
 
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
@@ -762,7 +732,7 @@ final class NotchView: NSView {
             hintRing.isHidden = !timing; hintTime.isHidden = !timing
             hintAgent.isHidden = !asking; hintAgentLabel.isHidden = !asking
             hintCal.isHidden = soon == nil || timing; hintCalLabel.isHidden = hintCal.isHidden
-            setDoneVisible(false); setHUDVisible(false)
+            setDoneVisible(false)
             if asking {
                 hintAgent.frame = NSRect(x: 12, y: (cb.height - 10) / 2, width: 10, height: 10)
                 hintAgentLabel.sizeToFit(); hintAgentLabel.frame.origin = NSPoint(x: 27, y: (cb.height - hintAgentLabel.frame.height) / 2)
@@ -787,41 +757,16 @@ final class NotchView: NSView {
                 hintTime.sizeToFit()
                 hintTime.frame.origin = NSPoint(x: cb.width - 10 - 18 - 6 - hintTime.frame.width, y: (cb.height - hintTime.frame.height) / 2)
             }
-        case .hud:
-            toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
-            setExpandedVisible(false); setMusicCardVisible(false); setDoneVisible(false)
-            [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
-            setHUDVisible(true)
-            if let e = hudEvent {
-                let sym: String
-                switch e.kind {
-                case .volume: sym = e.level == 0 || !e.on ? "speaker.slash.fill" : (e.level < 0.34 ? "speaker.wave.1.fill" : e.level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill")
-                case .brightness: sym = e.level < 0.5 ? "sun.min.fill" : "sun.max.fill"
-                case .capsLock: sym = e.on ? "capslock.fill" : "capslock"
-                }
-                hudIcon.image = UI.symbol(sym, size: 14, weight: .semibold)
-                let rowY = baseNotchSize.height + 11
-                hudIcon.frame = NSRect(x: padX, y: rowY, width: 18, height: 18)
-                if e.kind == .capsLock {
-                    hudBar.isHidden = true
-                    hudLabel.stringValue = e.on ? "Caps Lock on" : "Caps Lock off"; hudLabel.sizeToFit()
-                    hudLabel.frame.origin = NSPoint(x: padX + 26, y: rowY + (18 - hudLabel.frame.height) / 2)
-                } else {
-                    hudLabel.isHidden = true
-                    hudBar.frame = NSRect(x: padX + 28, y: rowY + 6, width: cb.width - padX * 2 - 28, height: 6)
-                    hudFill.frame = NSRect(x: 0, y: 0, width: hudBar.frame.width * CGFloat(e.level), height: 6)
-                }
-            }
         case .agentAsk:
             toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
-            setExpandedVisible(false); setMusicCardVisible(false); setDoneVisible(false); setHUDVisible(false)
+            setExpandedVisible(false); setMusicCardVisible(false); setDoneVisible(false)
             [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
             agentCard.isHidden = false
             agentCard.frame = NSRect(x: padX, y: baseNotchSize.height + 10, width: cb.width - padX * 2, height: cb.height - baseNotchSize.height - 20)
             layoutAgentCard()
         case .timerDone:
             toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
-            setHUDVisible(false); agentCard.isHidden = true
+            agentCard.isHidden = true
             setExpandedVisible(false); setMusicCardVisible(false)
             hintArt.isHidden = true; hintBars.isHidden = true; hintRing.isHidden = true; hintTime.isHidden = true
             setDoneVisible(true)
@@ -832,7 +777,7 @@ final class NotchView: NSView {
         case .shot:
             toastStack.isHidden = true
             setExpandedVisible(false)
-            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false); setHUDVisible(false)
+            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false)
             [hintAgent, hintAgentLabel, hintCal, hintCalLabel, agentCard].forEach { $0.isHidden = true }
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             shotViews.forEach { $0.isHidden = false }
@@ -846,7 +791,7 @@ final class NotchView: NSView {
         case .toast:
             shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
-            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false); setHUDVisible(false)
+            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false)
             [hintAgent, hintAgentLabel, hintCal, hintCalLabel, agentCard].forEach { $0.isHidden = true }
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             toastStack.isHidden = false
@@ -857,7 +802,7 @@ final class NotchView: NSView {
             toastStack.isHidden = true
             shotViews.forEach { $0.isHidden = true }
             [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
-            setMusicCardVisible(false); setDoneVisible(false); setHUDVisible(false); setExpandedVisible(false)
+            setMusicCardVisible(false); setDoneVisible(false); setExpandedVisible(false)
             island.isHidden = false
             island.topInset = baseNotchSize.height
             island.frame = cb
@@ -937,7 +882,6 @@ final class NotchView: NSView {
     }
 
     private func setDoneVisible(_ v: Bool) { doneLabel.isHidden = !v; doneRepeat.isHidden = !v; doneDismiss.isHidden = !v }
-    private func setHUDVisible(_ v: Bool) { hudIcon.isHidden = !v; hudBar.isHidden = !v; hudLabel.isHidden = !v }
 
     // MARK: Agents
 
