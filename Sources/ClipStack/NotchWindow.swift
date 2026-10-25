@@ -24,7 +24,7 @@ final class NotchController {
     private var hovering = false
     private var observers: [NSObjectProtocol] = []
 
-    private let expandedSize = NSSize(width: 560, height: 170)
+    private let expandedSize = NSSize(width: 920, height: 300)
     private let musicExtra: CGFloat = 84          // extra height for the player card when music is playing
     private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
     private let nowPlaying = NowPlayingMonitor()
@@ -35,6 +35,8 @@ final class NotchController {
     let hud = SystemHUD()
     let weather = WeatherMonitor()
     private var hudTimer: Timer?
+    private(set) var pomodoroSessions = 0
+    private var pomodoroRunning = false
     private var positionTimer: Timer?
     private var animToken = 0
     private let shotToastSize = NSSize(width: 520, height: 96)
@@ -53,6 +55,23 @@ final class NotchController {
         notchView.onDrop = { [weak self] in self?.handleDrop($0) ?? false }
         notchView.onShotAction = { [weak self] action, item in self?.shotAction(action, item) }
         notchView.latestText = { [weak self] in self?.store.items.first { $0.kind == .text }?.text ?? "" }
+        let island = notchView.island
+        island.data = self
+        island.onPick = { [weak self] item in self?.pick(item) }
+        island.onOpenHistory = { [weak self] in self?.collapse(); self?.openHistory() }
+        island.onShelfRemove = { [weak self] url in self?.shelf.remove(url) }
+        island.onShelfClear = { [weak self] in self?.shelf.clear() }
+        island.onTimerStart = { [weak self] min, pomo in self?.pomodoroRunning = pomo; self?.timer.start(minutes: min); self?.timerChanged() }
+        island.onTimerCancel = { [weak self] in self?.pomodoroRunning = false; self?.timer.cancel(); self?.timerChanged() }
+        island.onTimerAdd = { [weak self] min in self?.timer.add(minutes: min) }
+        island.onMusic = { [weak self] cmd in
+            switch cmd { case .playPause: self?.nowPlaying.playPause(); case .next: self?.nowPlaying.next(); case .previous: self?.nowPlaying.previous() }
+        }
+        island.onAgentDecision = { [weak self] perm, allow in self?.agents.decide(perm, allow: allow); if self?.state == .agentAsk { self?.collapse() } }
+        island.onJoin = { [weak self] item in
+            self?.collapse()
+            if let u = item.joinURL { NSWorkspace.shared.open(u) } else if let cal = URL(string: "ical://") { NSWorkspace.shared.open(cal) }
+        }
         notchView.shelf = shelf
         notchView.timer = timer
         notchView.agents = agents
@@ -121,6 +140,7 @@ final class NotchController {
         })
         observers.append(NotificationCenter.default.addObserver(forName: NotchTimer.tick, object: nil, queue: .main) { [weak self] _ in
             self?.notchView.needsLayout = true
+            if self?.state == .expanded { self?.notchView.island.tick() }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NotchTimer.finished, object: nil, queue: .main) { [weak self] _ in
             self?.timerFinished()
@@ -173,7 +193,7 @@ final class NotchController {
         case .hud:       size = NSSize(width: max(notchSize.width + 160, 380), height: notchSize.height + 40)
         case .agentAsk:  size = NSSize(width: max(notchSize.width + 260, 540), height: notchSize.height + 92)
         case .shot:      size = NSSize(width: max(shotToastSize.width, notchSize.width + 200), height: notchSize.height + shotToastSize.height)
-        case .expanded:  size = NSSize(width: expandedSize.width, height: expandedSize.height + (notchView.nowPlaying != nil ? musicExtra : 0))
+        case .expanded:  size = expandedSize
         }
         let x = notchCenterX - size.width / 2
         let y = screen.frame.maxY - size.height
@@ -238,13 +258,14 @@ final class NotchController {
 
     private func clicked() {
         if agents.waiting && state != .agentAsk && state != .expanded { setState(.agentAsk, animated: true); return }
-        if state == .agentAsk { notchView.selectedTab = .agents; expand(); return }
+        if state == .agentAsk { notchView.island.selectedTab = .agents; expand(); return }
         if state == .expanded { collapse(); openHistory() } else { expand() }
     }
 
     private func expand() {
         notchView.items = Array(store.filtered("").prefix(6))
-        if agents.waiting { notchView.selectedTab = .agents }
+        if agents.waiting { notchView.island.selectedTab = .agents }
+        notchView.island.refresh()
         setState(.expanded, animated: true)
     }
 
@@ -255,14 +276,18 @@ final class NotchController {
     }
 
     private func timerFinished() {
+        if pomodoroRunning { pomodoroSessions = (pomodoroSessions + 1) % 4; pomodoroRunning = false }
         setState(.timerDone, animated: true)
         scheduleCollapse(after: 8)
     }
 
     // MARK: Agents / calendar / HUD
 
+    private func islandRefresh() { if state == .expanded { notchView.island.refresh() } }
+
     private func agentsChanged() {
         notchView.needsLayout = true
+        islandRefresh()
         if state == .collapsed { setState(.collapsed, animated: true) }     // wing may appear/disappear
         if state == .agentAsk && !agents.waiting { collapse() }
     }
@@ -271,13 +296,14 @@ final class NotchController {
         guard Settings.agentsEnabled, Settings.notchEnabled else { return }
         notchView.needsLayout = true
         NSSound(named: "Tink")?.play()
-        if state == .expanded { notchView.selectedTab = .agents; setState(.expanded, animated: true); return }
+        if state == .expanded { notchView.island.selectedTab = .agents; notchView.island.refresh(); return }
         setState(.agentAsk, animated: true)
         scheduleCollapse(after: 25)
     }
 
     private func calendarChanged() {
         notchView.needsLayout = true
+        islandRefresh()
         if state == .collapsed { setState(.collapsed, animated: true) }
     }
 
@@ -301,6 +327,7 @@ final class NotchController {
         let now = notchView.nowPlaying != nil
         // Grow/shrink the notch only when playback starts/stops; plain progress updates just relayout in place.
         if was != now { setState(state, animated: true) } else { notchView.needsLayout = true }
+        islandRefresh()
         positionTimer?.invalidate()
         if let i = nowPlaying.info, i.isPlaying {
             positionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.notchView.tickProgress(0.5) }
@@ -361,7 +388,7 @@ final class NotchController {
         let general = NSPasteboard.general
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
             shelf.add(urls)
-            notchView.selectedTab = .shelf
+            notchView.island.selectedTab = .shelf
             general.clearContents(); general.writeObjects(urls as [NSURL]); return true
         }
         if let s = pb.string(forType: .string) {
@@ -496,6 +523,7 @@ final class NotchView: NSView {
     private let hudLabel = NSTextField(labelWithString: "")
     private let weatherLabel = NSTextField(labelWithString: "")
     private let glow = CAShapeLayer()
+    let island = IslandContentView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -687,6 +715,8 @@ final class NotchView: NSView {
         glow.fillColor = nil; glow.lineWidth = 2; glow.strokeColor = NSColor.clear.cgColor
         glow.shadowRadius = 10; glow.shadowOpacity = 0; glow.shadowOffset = .zero
         layer?.insertSublayer(glow, above: shape)
+        island.isHidden = true
+        content.addSubview(island)
         ([agentCard, agentList, hintAgent, hintAgentLabel, upNextList, hintCal, hintCalLabel, prompterScroll, prompterPlay, prompterSpeed, prompterHint,
           hudIcon, hudBar, hudLabel, weatherLabel]).forEach { $0.isHidden = true; content.addSubview($0) }
         cardTrack.isHidden = true; cardProgress.isHidden = true
@@ -826,100 +856,12 @@ final class NotchView: NSView {
         case .expanded:
             toastStack.isHidden = true
             shotViews.forEach { $0.isHidden = true }
-            hintArt.isHidden = true; hintBars.isHidden = true
-            setExpandedVisible(true)
-            var top = baseNotchSize.height + 8
-            let music = nowPlaying != nil
-            setMusicCardVisible(music)
-            if music {
-                let artS: CGFloat = 56
-                cardArt.frame = NSRect(x: padX, y: top, width: artS, height: artS)
-                let tx = padX + artS + 12
-                let controlsW: CGFloat = 110
-                let textW = cb.width - tx - padX - controlsW
-                cardTitle.frame = NSRect(x: tx, y: top + 2, width: textW, height: 17)
-                cardArtist.frame = NSRect(x: tx, y: top + 21, width: textW, height: 14)
-                cardTrack.frame = CGRect(x: tx, y: top + 44, width: textW, height: 3)
-                layoutProgress()
-                cardTime.sizeToFit()
-                cardTime.frame.origin = NSPoint(x: tx, y: top + 50)
-                let cx = cb.width - padX - controlsW
-                prevButton.frame = NSRect(x: cx, y: top + 14, width: 30, height: 28)
-                playButton.frame = NSRect(x: cx + 38, y: top + 12, width: 34, height: 32)
-                nextButton.frame = NSRect(x: cx + 80, y: top + 14, width: 30, height: 28)
-                top += artS + 28
-            }
-            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false); setHUDVisible(false)
-            [hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
-            header.isHidden = true
-            tabBar.isHidden = false
-            tabBar.frame = NSRect(x: padX, y: top - 2, width: 3 * 58 + 3 * 62 + 5 * 4, height: 20)
-            for (i, b) in tabButtons.enumerated() {
-                let on = i == selectedTab.rawValue
-                b.layer?.backgroundColor = (on ? NSColor(white: 1, alpha: 0.18) : NSColor.clear).cgColor
-                b.contentTintColor = on ? .white : NSColor.white.withAlphaComponent(0.55)
-            }
-            historyButton.sizeToFit()
-            historyButton.frame.origin = NSPoint(x: cb.width - padX - historyButton.frame.width, y: top - 3)
-            shelfClear.sizeToFit()
-            shelfClear.frame.origin = NSPoint(x: cb.width - padX - shelfClear.frame.width, y: top - 3)
-            let area = NSRect(x: padX, y: top + 26, width: cb.width - padX * 2, height: 72)
-            chipsStack.isHidden = selectedTab != .clips
-            historyButton.isHidden = selectedTab != .clips
-            let shelfOn = selectedTab == .shelf, shelfHas = !(shelf?.urls.isEmpty ?? true)
-            shelfStack.isHidden = !shelfOn || !shelfHas
-            shelfEmpty.isHidden = !shelfOn || shelfHas
-            shelfClear.isHidden = !shelfOn || !shelfHas
-            let timerOn = selectedTab == .timer, running = timer?.isRunning == true
-            timerPresets.isHidden = !timerOn || running
-            timerBig.isHidden = !timerOn || !running; timerSub.isHidden = timerBig.isHidden
-            timerCancel.isHidden = timerBig.isHidden; timerPlus.isHidden = timerBig.isHidden
-            chipsStack.frame = area
-            shelfStack.frame = area
-            shelfEmpty.frame = area
-            timerPresets.frame = NSRect(x: area.minX, y: area.minY + 14, width: area.width, height: 44)
-            if running, let tm = timer {
-                timerBig.stringValue = NotchTimer.format(tm.remaining); timerBig.sizeToFit()
-                timerBig.frame.origin = NSPoint(x: area.minX, y: area.minY + 8)
-                timerSub.stringValue = "of \(Int(tm.duration / 60)) min"; timerSub.sizeToFit()
-                timerSub.frame.origin = NSPoint(x: area.minX + timerBig.frame.width + 10, y: area.minY + 32)
-                timerCancel.sizeToFit(); timerPlus.sizeToFit()
-                timerCancel.frame.origin = NSPoint(x: area.maxX - timerCancel.frame.width, y: area.minY + 24)
-                timerPlus.frame.origin = NSPoint(x: timerCancel.frame.minX - 8 - timerPlus.frame.width, y: area.minY + 24)
-            }
-            // agents tab
-            let agentsOn = selectedTab == .agents
-            let hasPerm = !(agents?.pending.isEmpty ?? true)
-            agentCard.isHidden = !agentsOn || !hasPerm
-            agentList.isHidden = !agentsOn || hasPerm
-            if agentsOn {
-                if hasPerm { agentCard.frame = area; layoutAgentCard() } else { rebuildAgentList(); agentList.frame = area }
-            }
-            // up next tab
-            upNextList.isHidden = selectedTab != .upNext
-            if selectedTab == .upNext { rebuildUpNext(); upNextList.frame = area }
-            // prompter tab
-            let promptOn = selectedTab == .prompter
-            prompterScroll.isHidden = !promptOn; prompterPlay.isHidden = !promptOn; prompterSpeed.isHidden = !promptOn; prompterHint.isHidden = !promptOn
-            if promptOn {
-                prompterScroll.frame = NSRect(x: area.minX, y: area.minY, width: area.width - 150, height: area.height)
-                prompterPlay.sizeToFit(); prompterSpeed.sizeToFit()
-                prompterPlay.frame.origin = NSPoint(x: area.maxX - prompterPlay.frame.width, y: area.minY + 6)
-                prompterSpeed.frame.origin = NSPoint(x: area.maxX - prompterSpeed.frame.width, y: area.minY + 34)
-                prompterHint.sizeToFit(); prompterHint.frame.origin = NSPoint(x: area.maxX - 140, y: area.minY + 58)
-                prompterHint.frame.size.width = 140
-            }
-            // weather in the corner
-            if let w = weather?.reading {
-                weatherLabel.isHidden = false
-                weatherLabel.stringValue = "\(Int(w.tempC.rounded()))°" + (w.place.isEmpty ? "" : " · \(w.place)")
-                weatherLabel.sizeToFit()
-                weatherLabel.frame.origin = NSPoint(x: cb.width - padX - weatherLabel.frame.width, y: cb.height - 22)
-            } else { weatherLabel.isHidden = true }
-            dropHint.stringValue = selectedTab == .shelf ? "Drag a file out to use it anywhere" : (selectedTab == .agents ? "Claude Code hooks → Preferences › Agents" : "Drop files or text here to copy")
-            dropHint.sizeToFit()
-            dropHint.frame.origin = NSPoint(x: weatherLabel.isHidden ? (cb.width - dropHint.frame.width) / 2 : padX, y: cb.height - 22)
+            [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
+            setMusicCardVisible(false); setDoneVisible(false); setHUDVisible(false); setExpandedVisible(false)
+            island.isHidden = false
+            island.frame = cb
         }
+        if mode != .expanded { island.isHidden = true }
     }
 
     /// Morph the black shape from one rect to another with Core Animation; content cross-fades.
@@ -1241,9 +1183,8 @@ final class ShelfChip: NSView, NSDraggingSource {
         self.url = url
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor
-        layer?.cornerRadius = 14; layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1; layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor
+        layer?.backgroundColor = NSColor(white: 1, alpha: 0.08).cgColor
+        layer?.cornerRadius = 18; layer?.cornerCurve = .continuous
         let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: url.path))
         icon.imageScaling = .scaleProportionallyUpOrDown
         let name = NSTextField(labelWithString: url.lastPathComponent)
@@ -1323,11 +1264,9 @@ final class ChipView: NSView, NSDraggingSource {
         self.item = item
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor
-        layer?.cornerRadius = 14
+        layer?.backgroundColor = NSColor(white: 1, alpha: 0.08).cgColor
+        layer?.cornerRadius = 18
         layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor
 
         let type = item.smartType
         let icon = NSImageView()
@@ -1352,7 +1291,7 @@ final class ChipView: NSView, NSDraggingSource {
 
         let label = NSTextField(wrappingLabelWithString: item.preview)
         label.textColor = .white
-        label.font = .systemFont(ofSize: 11)
+        label.font = Theme.font(12, .medium)
         label.maximumNumberOfLines = isThumb ? 1 : 2
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -1365,7 +1304,7 @@ final class ChipView: NSView, NSDraggingSource {
         v.orientation = .vertical
         v.alignment = .leading
         v.spacing = 4
-        v.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 6, right: 8)
+        v.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 10, right: 12)
         v.translatesAutoresizingMaskIntoConstraints = false
         addSubview(v)
         NSLayoutConstraint.activate([
@@ -1373,8 +1312,8 @@ final class ChipView: NSView, NSDraggingSource {
             v.bottomAnchor.constraint(equalTo: bottomAnchor),
             v.leadingAnchor.constraint(equalTo: leadingAnchor),
             v.trailingAnchor.constraint(equalTo: trailingAnchor),
-            icon.widthAnchor.constraint(equalToConstant: isThumb ? 48 : 18),
-            icon.heightAnchor.constraint(equalToConstant: isThumb ? 30 : 18),
+            icon.widthAnchor.constraint(equalToConstant: isThumb ? 64 : 20),
+            icon.heightAnchor.constraint(equalToConstant: isThumb ? 40 : 20),
             label.widthAnchor.constraint(equalTo: v.widthAnchor, constant: -16),
         ])
         toolTip = item.text.map { String($0.prefix(400)) }
@@ -1383,8 +1322,8 @@ final class ChipView: NSView, NSDraggingSource {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func mouseEntered(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.2).cgColor; layer?.borderColor = NSColor(white: 1, alpha: 0.18).cgColor }
-    override func mouseExited(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor; layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor }
+    override func mouseEntered(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.16).cgColor }
+    override func mouseExited(with event: NSEvent) { layer?.backgroundColor = NSColor(white: 1, alpha: 0.08).cgColor }
     override func mouseDown(with event: NSEvent) { dragStart = event.locationInWindow }
     override func mouseUp(with event: NSEvent) { if dragStart != nil { onTap?() }; dragStart = nil }
 
@@ -1421,4 +1360,16 @@ private extension NSBezierPath {
         }
         return path
     }
+}
+
+
+// MARK: - Island data
+
+extension NotchController: IslandDataSource {
+    var recentItems: [ClipItem] { Array(store.filtered("").prefix(6)) }
+    var totalItems: Int { store.items.count }
+    var todayItems: Int { store.items.filter { Calendar.current.isDateInToday($0.createdAt) }.count }
+    var shelfURLs: [URL] { shelf.urls }
+    var nowPlayingInfo: NowPlayingInfo? { nowPlaying.info }
+    var promptText: String { store.items.first { $0.kind == .text }?.text ?? "" }
 }
