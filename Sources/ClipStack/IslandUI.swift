@@ -469,7 +469,7 @@ final class IslandContentView: NSView {
             right.highlighted = true
             let name = d.agents.sessions[p.sessionID]?.name ?? "Claude Code"
             let t = Theme.label("\(name) wants to run \(p.tool)", size: 15, weight: .semibold, color: .white)
-            let cmd = NSTextField(wrappingLabelWithString: p.summary); cmd.font = .monospacedSystemFont(ofSize: 13, weight: .regular); cmd.textColor = Theme.label; cmd.maximumNumberOfLines = 3
+            let cmd = NSTextField(wrappingLabelWithString: p.summary); cmd.font = .monospacedSystemFont(ofSize: 13, weight: .regular); cmd.textColor = Theme.secondary; cmd.maximumNumberOfLines = 3
             let allow = PillButton("Allow", filled: true, target: self, action: #selector(allowTapped))
             let deny = PillButton("Deny", target: self, action: #selector(denyTapped))
             [t, cmd, allow, deny].forEach { right.addSubview($0) }
