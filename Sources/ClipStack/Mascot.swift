@@ -1,6 +1,7 @@
 import AppKit
 
-/// Pip: two eyes that live beside the notch. Blinks, follows the cursor, reacts to what the app is doing.
+/// Pip: a small round character that lives beside the notch. Breathes, blinks, follows the cursor,
+/// smiles when you copy, goes wide-eyed orange when an agent needs you, sways to music, dozes when idle.
 final class MascotView: NSView {
     enum Mood { case normal, happy, alert, sleepy, groove }
 
@@ -8,83 +9,128 @@ final class MascotView: NSView {
     /// -1…1 horizontal gaze, set from the cursor position.
     var gaze: CGFloat = 0 { didSet { needsLayout = true } }
 
-    private let left = CAShapeLayer()
-    private let right = CAShapeLayer()
+    private let body = CAShapeLayer()
+    private let shine = CAShapeLayer()
+    private let cheekL = CAShapeLayer(), cheekR = CAShapeLayer()
+    private let eyeL = CAShapeLayer(), eyeR = CAShapeLayer()
+    private let glintL = CAShapeLayer(), glintR = CAShapeLayer()
+    private let mouth = CAShapeLayer()
+    private let zzz = CATextLayer()
     private var blinkTimer: Timer?
     private var happyTimer: Timer?
-    private var lidScale: CGFloat = 1        // 1 open … 0.08 closed
-    private var bob: CGFloat = 0
+    private var motionTimer: Timer?
+    private var phase: CGFloat = 0
+    private var eyeOpen: CGFloat = 1
+
+    private static let bodyColor = NSColor(red: 0.52, green: 0.58, blue: 1.0, alpha: 1)
+    private static let alertColor = NSColor(red: 1.0, green: 0.62, blue: 0.25, alpha: 1)
+    private static let ink = NSColor(red: 0.10, green: 0.08, blue: 0.22, alpha: 1)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        for e in [left, right] {
-            e.fillColor = NSColor.white.cgColor
-            e.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            layer?.addSublayer(e)
-        }
+        body.fillColor = Self.bodyColor.cgColor
+        shine.fillColor = NSColor.white.withAlphaComponent(0.22).cgColor
+        for c in [cheekL, cheekR] { c.fillColor = NSColor(red: 1, green: 0.45, blue: 0.6, alpha: 0.55).cgColor }
+        for e in [eyeL, eyeR] { e.fillColor = Self.ink.cgColor; e.anchorPoint = CGPoint(x: 0.5, y: 0.5) }
+        for g in [glintL, glintR] { g.fillColor = NSColor.white.cgColor }
+        mouth.fillColor = nil; mouth.strokeColor = Self.ink.cgColor; mouth.lineWidth = 1.6; mouth.lineCap = .round
+        zzz.string = "z"; zzz.fontSize = 9; zzz.foregroundColor = NSColor.white.withAlphaComponent(0.8).cgColor
+        zzz.alignmentMode = .center; zzz.contentsScale = 2; zzz.isHidden = true
+        for l in [body, shine, cheekL, cheekR, eyeL, eyeR, glintL, glintR, mouth, zzz] as [CALayer] { layer?.addSublayer(l) }
         scheduleBlink()
+        startMotion()
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    override var intrinsicContentSize: NSSize { NSSize(width: 30, height: 18) }
+    override var intrinsicContentSize: NSSize { NSSize(width: 34, height: 28) }
+
+    // MARK: Drawing
 
     override func layout() {
         super.layout()
-        let eyeW: CGFloat = 8, eyeH: CGFloat = mood == .alert ? 15 : 13, gap: CGFloat = 7
-        let cx = bounds.midX + gaze * 3, cy = bounds.midY + bob
-        let lx = cx - gap / 2 - eyeW / 2, rx = cx + gap / 2 + eyeW / 2
-        CATransaction.begin(); CATransaction.setDisableActions(true)
-        for (e, x) in [(left, lx), (right, rx)] {
-            e.bounds = CGRect(x: 0, y: 0, width: eyeW, height: eyeH)
-            e.position = CGPoint(x: x, y: cy)
-            e.path = eyePath(w: eyeW, h: eyeH)
-            e.transform = CATransform3DMakeScale(1, lidScale, 1)
-        }
-        CATransaction.commit()
-    }
-
-    private func eyePath(w: CGFloat, h: CGFloat) -> CGPath {
+        let w = bounds.width, h = bounds.height
+        // idle breathing + mood-specific motion
+        let breathe = 1 + 0.025 * sin(phase * 1.6)
+        var dx: CGFloat = 0, dy: CGFloat = 0, squash: CGFloat = 1
         switch mood {
-        case .happy:
-            // upward arcs ^‿^
-            let p = CGMutablePath()
-            p.addArc(center: CGPoint(x: w / 2, y: h * 0.25), radius: w * 0.62, startAngle: .pi * 0.15, endAngle: .pi * 0.85, clockwise: false)
-            p.addArc(center: CGPoint(x: w / 2, y: h * 0.25), radius: w * 0.62 - 2.6, startAngle: .pi * 0.85, endAngle: .pi * 0.15, clockwise: true)
-            p.closeSubpath()
-            return p
-        default:
-            return CGPath(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerWidth: w / 2, cornerHeight: w / 2, transform: nil)
+        case .groove: dx = sin(phase * 3.7) * 2.2; squash = 1 + 0.06 * sin(phase * 7.4)
+        case .happy:  dy = -abs(sin(phase * 9)) * 2.5; squash = 1 + 0.08 * sin(phase * 9)
+        case .alert:  dx = sin(phase * 18) * 0.8
+        default: break
         }
+        let bw: CGFloat = 26 * breathe * squash, bh: CGFloat = 22 * breathe / squash
+        let bx = w / 2 - bw / 2 + dx, by = h / 2 - bh / 2 + dy + 1
+        let bodyRect = CGRect(x: bx, y: by, width: bw, height: bh)
+
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        body.path = CGPath(roundedRect: bodyRect, cornerWidth: bw * 0.46, cornerHeight: bh * 0.5, transform: nil)
+        shine.path = CGPath(ellipseIn: CGRect(x: bx + bw * 0.16, y: by + bh * 0.62, width: bw * 0.36, height: bh * 0.2), transform: nil)
+
+        let g = gaze * 1.6
+        let eyeY = by + bh * 0.52
+        let eyeW: CGFloat = 4.2, eyeH: CGFloat = (mood == .alert ? 7.2 : 5.6) * eyeOpen
+        let lx = bx + bw * 0.34 + g, rx = bx + bw * 0.66 + g
+        for (e, x) in [(eyeL, lx), (eyeR, rx)] {
+            if mood == .happy {
+                // closed happy arcs
+                let p = CGMutablePath()
+                p.addArc(center: CGPoint(x: x, y: eyeY - 1.5), radius: 3, startAngle: .pi * 0.15, endAngle: .pi * 0.85, clockwise: false)
+                e.path = p; e.fillColor = nil; e.strokeColor = Self.ink.cgColor; e.lineWidth = 1.6; e.lineCap = .round
+            } else if mood == .sleepy {
+                let p = CGMutablePath(); p.move(to: CGPoint(x: x - 2.6, y: eyeY)); p.addLine(to: CGPoint(x: x + 2.6, y: eyeY))
+                e.path = p; e.fillColor = nil; e.strokeColor = Self.ink.cgColor; e.lineWidth = 1.6; e.lineCap = .round
+            } else {
+                e.path = CGPath(ellipseIn: CGRect(x: x - eyeW / 2, y: eyeY - eyeH / 2, width: eyeW, height: max(0.6, eyeH)), transform: nil)
+                e.fillColor = Self.ink.cgColor; e.strokeColor = nil
+            }
+        }
+        let showGlint = mood != .happy && mood != .sleepy && eyeOpen > 0.5
+        glintL.isHidden = !showGlint; glintR.isHidden = !showGlint
+        glintL.path = CGPath(ellipseIn: CGRect(x: lx + 0.4, y: eyeY + 1.2, width: 1.6, height: 1.6), transform: nil)
+        glintR.path = CGPath(ellipseIn: CGRect(x: rx + 0.4, y: eyeY + 1.2, width: 1.6, height: 1.6), transform: nil)
+
+        cheekL.path = CGPath(ellipseIn: CGRect(x: bx + bw * 0.14, y: by + bh * 0.3, width: 4.5, height: 2.6), transform: nil)
+        cheekR.path = CGPath(ellipseIn: CGRect(x: bx + bw * 0.86 - 4.5, y: by + bh * 0.3, width: 4.5, height: 2.6), transform: nil)
+
+        let m = CGMutablePath(); let mx = bx + bw / 2 + g * 0.5, my = by + bh * 0.3
+        switch mood {
+        case .happy, .groove:
+            m.addArc(center: CGPoint(x: mx, y: my + 1.5), radius: 3.4, startAngle: .pi * 1.15, endAngle: .pi * 1.85, clockwise: false)
+        case .alert:
+            m.addEllipse(in: CGRect(x: mx - 1.8, y: my - 2.2, width: 3.6, height: 3.6))
+        case .sleepy:
+            m.move(to: CGPoint(x: mx - 1.5, y: my)); m.addLine(to: CGPoint(x: mx + 1.5, y: my))
+        case .normal:
+            m.addArc(center: CGPoint(x: mx, y: my + 1.2), radius: 2.4, startAngle: .pi * 1.2, endAngle: .pi * 1.8, clockwise: false)
+        }
+        mouth.path = m
+        zzz.isHidden = mood != .sleepy
+        zzz.frame = CGRect(x: bx + bw - 4, y: by + bh - 2 + sin(phase * 1.6) * 1.5, width: 10, height: 12)
+        zzz.opacity = Float(0.5 + 0.5 * sin(phase * 1.6))
+        CATransaction.commit()
     }
 
     private func applyMood() {
         happyTimer?.invalidate()
-        let color: NSColor = mood == .alert ? .systemOrange : .white
-        left.fillColor = color.cgColor; right.fillColor = color.cgColor
-        switch mood {
-        case .sleepy: setLid(0.45, animated: true)
-        case .alert: setLid(1.15, animated: true)
-        case .happy:
-            setLid(1, animated: true)
-            happyTimer = Timer.scheduledTimer(withTimeInterval: 1.1, repeats: false) { [weak self] _ in self?.mood = .normal }
-        case .groove: setLid(0.85, animated: true); startBob()
-        case .normal: setLid(1, animated: true)
+        CATransaction.begin(); CATransaction.setAnimationDuration(0.25)
+        body.fillColor = (mood == .alert ? Self.alertColor : Self.bodyColor).cgColor
+        CATransaction.commit()
+        if mood == .happy {
+            happyTimer = Timer.scheduledTimer(withTimeInterval: 1.3, repeats: false) { [weak self] _ in if self?.mood == .happy { self?.mood = .normal } }
         }
-        if mood != .groove { stopBob() }
         needsLayout = true
     }
 
-    private func setLid(_ v: CGFloat, animated: Bool) {
-        lidScale = v
-        if animated {
-            CATransaction.begin(); CATransaction.setAnimationDuration(0.18)
-            for e in [left, right] { e.transform = CATransform3DMakeScale(1, v, 1) }
-            CATransaction.commit()
-        } else { needsLayout = true }
-    }
+    // MARK: Motion & blink
 
-    // MARK: Blink
+    private func startMotion() {
+        motionTimer = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
+            guard let self, !self.isHidden, self.window != nil else { return }
+            self.phase += 1 / 30
+            self.needsLayout = true
+        }
+    }
 
     private func scheduleBlink() {
         blinkTimer?.invalidate()
@@ -94,31 +140,12 @@ final class MascotView: NSView {
     }
 
     private func blink() {
-        guard mood != .happy, window != nil, !isHidden else { return }
-        let a = CAKeyframeAnimation(keyPath: "transform.scale.y")
-        a.values = [lidScale, 0.08, lidScale]; a.keyTimes = [0, 0.5, 1]; a.duration = 0.14
-        left.add(a, forKey: "blink"); right.add(a, forKey: "blink")
-        // occasional double blink
-        if Bool.random() && Int.random(in: 0..<4) == 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
-                self?.left.add(a, forKey: "blink2"); self?.right.add(a, forKey: "blink2")
-            }
+        guard mood == .normal || mood == .groove || mood == .alert, window != nil, !isHidden else { return }
+        let steps: [CGFloat] = [0.6, 0.15, 0.6, 1]
+        for (i, v) in steps.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.04) { [weak self] in self?.eyeOpen = v; self?.needsLayout = true }
         }
     }
 
-    // MARK: Groove (music)
-
-    private var bobTimer: Timer?
-    private func startBob() {
-        bobTimer?.invalidate()
-        var t: CGFloat = 0
-        bobTimer = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
-            t += 1 / 30
-            self?.bob = sin(t * 2 * .pi * 1.87) * 1.6     // ~112 BPM
-            self?.needsLayout = true
-        }
-    }
-    private func stopBob() { bobTimer?.invalidate(); bobTimer = nil; bob = 0 }
-
-    deinit { blinkTimer?.invalidate(); bobTimer?.invalidate(); happyTimer?.invalidate() }
+    deinit { blinkTimer?.invalidate(); motionTimer?.invalidate(); happyTimer?.invalidate() }
 }

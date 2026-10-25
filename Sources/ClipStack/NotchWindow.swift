@@ -746,7 +746,7 @@ final class NotchView: NSView {
             hintArt.isHidden = !music || asking
             let showPip = Settings.notchMascot && !music && !asking
             mascot.isHidden = !showPip
-            if showPip { mascot.frame = NSRect(x: 8, y: (cb.height - 18) / 2, width: 30, height: 18) }
+            if showPip { mascot.frame = NSRect(x: 5, y: (cb.height - 28) / 2, width: 34, height: 28) }
             hintBars.isHidden = !music || timing || soon != nil
             hintRing.isHidden = !timing; hintTime.isHidden = !timing
             hintAgent.isHidden = !asking; hintAgentLabel.isHidden = !asking
