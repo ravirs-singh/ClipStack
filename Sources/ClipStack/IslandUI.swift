@@ -249,6 +249,8 @@ final class IslandContentView: NSView {
     var onJoin: ((CalendarMonitor.Item) -> Void)?
 
     var selectedTab: Tab = .home { didSet { tabs.selected = selectedTab.rawValue; refresh() } }
+    /// Height of the physical notch; everything is laid out below it.
+    var topInset: CGFloat = 32 { didSet { needsLayout = true } }
 
     private let tabs = TabCapsule()
     private let left = GlassCard(), right = GlassCard()
@@ -279,8 +281,8 @@ final class IslandContentView: NSView {
     override func layout() {
         super.layout()
         let w = bounds.width, h = bounds.height
-        tabs.frame = NSRect(x: padX, y: 12, width: tabs.preferredWidth, height: 34)
-        let y0: CGFloat = 56, ch = h - y0 - 14
+        tabs.frame = NSRect(x: padX, y: topInset + 8, width: tabs.preferredWidth, height: 34)
+        let y0: CGFloat = topInset + 52, ch = h - y0 - 14
         let gap: CGFloat = 10
         if selectedTab == .home {
             let widths: [CGFloat] = [232, 134, 144, w - padX * 2 - 232 - 134 - 144 - gap * 3]
@@ -332,7 +334,7 @@ final class IslandContentView: NSView {
         let t = Theme.label(title, size: 12, color: Theme.secondary); card.addSubview(t)
         var s: NSTextField?
         if let subtitle { let l = Theme.label(subtitle, size: 12, color: Theme.secondary); card.addSubview(l); s = l }
-        let b = Theme.label(big, size: big.count > 3 ? 34 : 50, weight: .light, color: .white); card.addSubview(b)
+        let b = Theme.label(big, size: big.count > 3 ? 34 : 50, weight: .light, color: .white); if !big.isEmpty { card.addSubview(b) }
         var suf: NSTextField?
         if let bigSuffix { let l = Theme.label(bigSuffix, size: 18, weight: .light, color: Theme.dim); card.addSubview(l); suf = l }
         var cap: NSTextField?
@@ -394,7 +396,7 @@ final class IslandContentView: NSView {
         if let r = d.weather.reading {
             summary(w, title: r.place.isEmpty ? "Weather" : r.place, subtitle: Self.condition(r.code), big: "\(Int(r.tempC.rounded()))", bigSuffix: "°")
         } else {
-            summary(w, title: "Weather", subtitle: Settings.weatherEnabled ? "Locating…" : "Off", big: "--", bigSuffix: "°")
+            summary(w, title: "Weather", subtitle: Settings.weatherEnabled ? "Locating…" : "Off", big: "", caption: Settings.weatherEnabled ? "Finding you…" : "Enable in Preferences")
         }
         // Up next
         let u = homeCards[3]
@@ -403,7 +405,7 @@ final class IslandContentView: NSView {
             let arrow = CircleButton(symbol: "arrow.up.right", size: 32, filled: true, target: self, action: #selector(joinFirst))
             summary(u, title: "Up next", subtitle: CalendarMonitor.relative(e), big: f.string(from: e.start), caption: e.title, button: arrow, dot: .systemBlue)
         } else {
-            summary(u, title: "Up next", subtitle: Settings.calendarEnabled ? "Nothing in 24 h" : "Calendar off", big: "--:--")
+            summary(u, title: "Up next", subtitle: Settings.calendarEnabled ? "Nothing in 24 h" : "Calendar off", big: "", caption: Settings.calendarEnabled ? "Free for now" : "Enable in Preferences")
         }
     }
 

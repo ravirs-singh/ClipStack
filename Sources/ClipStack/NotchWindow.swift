@@ -24,7 +24,7 @@ final class NotchController {
     private var hovering = false
     private var observers: [NSObjectProtocol] = []
 
-    private let expandedSize = NSSize(width: 720, height: 236)
+    private var expandedSize: NSSize { NSSize(width: 720, height: 236 + notchSize.height) }
     private let musicExtra: CGFloat = 84          // extra height for the player card when music is playing
     private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
     private let nowPlaying = NowPlayingMonitor()
@@ -859,6 +859,7 @@ final class NotchView: NSView {
             [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
             setMusicCardVisible(false); setDoneVisible(false); setHUDVisible(false); setExpandedVisible(false)
             island.isHidden = false
+            island.topInset = baseNotchSize.height
             island.frame = cb
         }
         if mode != .expanded { island.isHidden = true }
