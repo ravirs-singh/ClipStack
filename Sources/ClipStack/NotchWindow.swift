@@ -1247,7 +1247,7 @@ final class FlippedView: NSView {
 }
 
 /// Button that reacts to the very first click even when its panel isn't key.
-final class FirstClickButton: NSButton {
+class FirstClickButton: NSButton {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
