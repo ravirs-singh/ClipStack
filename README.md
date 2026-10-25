@@ -27,9 +27,6 @@ A lightweight menu-bar clipboard history app written in Swift (pure AppKit — b
 - **Up Next**: next calendar events (with Join for Zoom/Meet/Teams) and today's reminders; the wing counts down 10 min before.
 - **System HUD** in the notch for volume, brightness and Caps Lock; **weather** in the island corner; a **Prompter** tab that
   scrolls your last copied text; configurable **glow** tinted by album art / agent state.
-- **Pip**, the notch mascot: a small round character beside the notch that breathes, blinks, follows your cursor,
-  smiles and bounces when you copy, turns orange and wide-eyed when an agent is waiting, sways to your music and dozes
-  (with a little z) when you're idle. Optional.
 - **Shelf & Timers in the notch**: drop files on the notch to keep them on a shelf and drag them out into any app later;
   start a 5–60 min timer and watch the countdown ring in the notch wing, with a done banner (+5 min / Dismiss).
 - **Interactive notch** (Dynamic-Island style): sits over the MacBook notch, flashes what you just copied, expands on hover
@@ -70,7 +67,6 @@ For development: `swift run` (menu-bar icon appears; "Launch at login" is only a
 | `CalendarMonitor.swift` | EventKit events/reminders, join-link detection |
 | `SystemHUD.swift` | Volume/brightness/Caps Lock watchers |
 | `Weather.swift` | CoreLocation + Open-Meteo |
-| `Mascot.swift` | Pip, the eyes beside the notch |
 | `Shelf.swift` | Shelf store, notch timer, ring view |
 | `NowPlaying.swift` | Spotify / Music polling via Apple Events, audio-bars view |
 | `NotchWindow.swift` | Notch panel: shape, toast, hover-expand chips, drag & drop |

@@ -293,7 +293,6 @@ final class NotchPane: PreferencePane {
     private lazy var weatherCheck = checkbox("Show the weather (uses your location)", #selector(changed))
     private lazy var hudCheck = checkbox("Show volume, brightness and Caps Lock changes in the notch", #selector(changed))
     private let glowPopup = NSPopUpButton()
-    private lazy var pipCheck = checkbox("Show Pip, the eyes beside the notch", #selector(changed))
 
     override func build() {
         row("Notch:", enableCheck)
@@ -312,8 +311,6 @@ final class NotchPane: PreferencePane {
         for t in ["Off", "Subtle", "Vivid"] { glowPopup.addItem(withTitle: t) }
         glowPopup.target = self; glowPopup.action = #selector(glowChanged)
         row("Glow:", glowPopup)
-        row("Mascot:", pipCheck)
-        note("Pip blinks, follows your cursor, smiles when you copy, turns orange when an agent needs you, and bobs to your music.")
         note("Tints the island's edge with the album art colour, orange when an agent needs you, amber while a timer runs.")
         note("Album art on the left of the notch, audio bars on the right; hover for controls. macOS will ask once to allow ClipStack to control each player.")
         note("For YouTube Music / YouTube in Chrome, Brave, Edge or Arc: enable View ▸ Developer ▸ “Allow JavaScript from Apple Events” in the browser once.")
@@ -331,8 +328,6 @@ final class NotchPane: PreferencePane {
         weatherCheck.state = Settings.weatherEnabled ? .on : .off
         hudCheck.state = Settings.hudEnabled ? .on : .off
         glowPopup.selectItem(at: Settings.notchGlow)
-        pipCheck.state = Settings.notchMascot ? .on : .off
-        pipCheck.isEnabled = Settings.notchEnabled
         [calCheck, weatherCheck, hudCheck, glowPopup].forEach { $0.isEnabled = Settings.notchEnabled }
     }
 
@@ -344,7 +339,6 @@ final class NotchPane: PreferencePane {
         Settings.calendarEnabled = calCheck.state == .on
         Settings.weatherEnabled = weatherCheck.state == .on
         Settings.hudEnabled = hudCheck.state == .on
-        Settings.notchMascot = pipCheck.state == .on
     }
     @objc private func glowChanged() { Settings.notchGlow = glowPopup.indexOfSelectedItem }
 }

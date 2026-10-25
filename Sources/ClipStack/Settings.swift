@@ -68,11 +68,6 @@ enum Settings {
         get { d.object(forKey: "agentsEnabled") as? Bool ?? true }
         set { d.set(newValue, forKey: "agentsEnabled"); notify() }
     }
-    /// Pip, the eyes beside the notch.
-    static var notchMascot: Bool {
-        get { d.object(forKey: "notchMascot") as? Bool ?? true }
-        set { d.set(newValue, forKey: "notchMascot"); notify() }
-    }
     /// 0 off · 1 subtle · 2 vivid
     static var notchGlow: Int {
         get { d.object(forKey: "notchGlow") as? Int ?? 1 }

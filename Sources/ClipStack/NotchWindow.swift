@@ -34,9 +34,6 @@ final class NotchController {
     let hud = SystemHUD()
     let weather = WeatherMonitor()
     private var hudTimer: Timer?
-    private var gazeTimer: Timer?
-    private var lastActivity = Date()
-    private var lastMouse = NSPoint.zero
     private var positionTimer: Timer?
     private var animToken = 0
     private let shotToastSize = NSSize(width: 520, height: 96)
@@ -118,10 +115,6 @@ final class NotchController {
         observers.append(NotificationCenter.default.addObserver(forName: SystemHUD.changed, object: nil, queue: .main) { [weak self] n in
             if let e = n.userInfo?["event"] as? SystemHUD.Event { self?.showHUD(e) }
         })
-        observers.append(NotificationCenter.default.addObserver(forName: ClipStore.didAdd, object: nil, queue: .main) { [weak self] _ in
-            self?.lastActivity = Date(); self?.notchView.mascot.mood = .happy
-        })
-        gazeTimer = Timer.scheduledTimer(withTimeInterval: 1 / 15, repeats: true) { [weak self] _ in self?.gazeTick() }
         observers.append(NotificationCenter.default.addObserver(forName: ShelfStore.changed, object: nil, queue: .main) { [weak self] _ in
             self?.notchView.rebuildShelf()
         })
@@ -169,8 +162,7 @@ final class NotchController {
         switch state {
         case .collapsed:
             let music = notchView.nowPlaying != nil
-            let mascot = Settings.notchMascot && !music && !agents.waiting
-            let left: CGFloat = agents.waiting ? 84 : (music ? wing : (mascot ? 44 : 0))
+            let left: CGFloat = agents.waiting ? 84 : (music ? wing : 0)
             let right: CGFloat = timer.isRunning ? 72 : (calendar.imminent != nil ? 70 : (music ? wing : 0))
             size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0) + left + right, height: notchSize.height)
         case .toast:     size = NSSize(width: max(notchSize.width + 240, 380), height: notchSize.height + 14)
@@ -265,21 +257,6 @@ final class NotchController {
     }
 
     // MARK: Agents / calendar / HUD
-
-    /// Pip follows the cursor and picks a mood from what's going on.
-    private func gazeTick() {
-        guard Settings.notchEnabled, Settings.notchMascot, !notchView.mascot.isHidden else { return }
-        let m = NSEvent.mouseLocation
-        if m != lastMouse { lastMouse = m; lastActivity = Date() }
-        let dx = (m.x - panel.frame.midX) / 600
-        notchView.mascot.gaze = max(-1, min(1, dx))
-        let v = notchView.mascot
-        if v.mood == .happy { return }
-        if agents.waiting { v.mood = .alert }
-        else if nowPlaying.info?.isPlaying == true { v.mood = .groove }
-        else if Date().timeIntervalSince(lastActivity) > 180 { v.mood = .sleepy }
-        else { v.mood = .normal }
-    }
 
     private func agentsChanged() {
         notchView.needsLayout = true
@@ -516,7 +493,6 @@ final class NotchView: NSView {
     private let hudLabel = NSTextField(labelWithString: "")
     private let weatherLabel = NSTextField(labelWithString: "")
     private let glow = CAShapeLayer()
-    let mascot = MascotView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -709,7 +685,7 @@ final class NotchView: NSView {
         glow.shadowRadius = 10; glow.shadowOpacity = 0; glow.shadowOffset = .zero
         layer?.insertSublayer(glow, above: shape)
         ([agentCard, agentList, hintAgent, hintAgentLabel, upNextList, hintCal, hintCalLabel, prompterScroll, prompterPlay, prompterSpeed, prompterHint,
-          hudIcon, hudBar, hudLabel, weatherLabel, mascot]).forEach { $0.isHidden = true; content.addSubview($0) }
+          hudIcon, hudBar, hudLabel, weatherLabel]).forEach { $0.isHidden = true; content.addSubview($0) }
         cardTrack.isHidden = true; cardProgress.isHidden = true
 
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
@@ -749,9 +725,6 @@ final class NotchView: NSView {
             let asking = agents?.waiting == true
             let soon = calendar?.imminent
             hintArt.isHidden = !music || asking
-            let showPip = Settings.notchMascot && !music && !asking
-            mascot.isHidden = !showPip
-            if showPip { mascot.frame = NSRect(x: 5, y: (cb.height - 28) / 2, width: 34, height: 28) }
             hintBars.isHidden = !music || timing || soon != nil
             hintRing.isHidden = !timing; hintTime.isHidden = !timing
             hintAgent.isHidden = !asking; hintAgentLabel.isHidden = !asking
@@ -783,7 +756,6 @@ final class NotchView: NSView {
             }
         case .hud:
             toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
-            mascot.isHidden = true
             setExpandedVisible(false); setMusicCardVisible(false); setDoneVisible(false)
             [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
             setHUDVisible(true)
@@ -808,7 +780,6 @@ final class NotchView: NSView {
             }
         case .agentAsk:
             toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
-            mascot.isHidden = true
             setExpandedVisible(false); setMusicCardVisible(false); setDoneVisible(false); setHUDVisible(false)
             [hintArt, hintBars, hintRing, hintTime, hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
             agentCard.isHidden = false
@@ -816,7 +787,6 @@ final class NotchView: NSView {
             layoutAgentCard()
         case .timerDone:
             toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
-            mascot.isHidden = true
             setHUDVisible(false); agentCard.isHidden = true
             setExpandedVisible(false); setMusicCardVisible(false)
             hintArt.isHidden = true; hintBars.isHidden = true; hintRing.isHidden = true; hintTime.isHidden = true
@@ -828,7 +798,6 @@ final class NotchView: NSView {
         case .shot:
             toastStack.isHidden = true
             setExpandedVisible(false)
-            mascot.isHidden = true
             hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false); setHUDVisible(false)
             [hintAgent, hintAgentLabel, hintCal, hintCalLabel, agentCard].forEach { $0.isHidden = true }
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
@@ -843,7 +812,6 @@ final class NotchView: NSView {
         case .toast:
             shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
-            mascot.isHidden = true
             hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false); setHUDVisible(false)
             [hintAgent, hintAgentLabel, hintCal, hintCalLabel, agentCard].forEach { $0.isHidden = true }
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
@@ -879,7 +847,6 @@ final class NotchView: NSView {
             }
             hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false); setHUDVisible(false)
             [hintAgent, hintAgentLabel, hintCal, hintCalLabel].forEach { $0.isHidden = true }
-            mascot.isHidden = true
             header.isHidden = true
             tabBar.isHidden = false
             tabBar.frame = NSRect(x: padX, y: top - 2, width: 3 * 58 + 3 * 62 + 5 * 4, height: 20)
