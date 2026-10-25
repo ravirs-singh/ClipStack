@@ -22,6 +22,11 @@ A lightweight menu-bar clipboard history app written in Swift (pure AppKit — b
 - Filter bar: All / Text / Images / Screenshots / Files
 - **Now Playing in the notch**: album art on the left, animated audio bars on the right while Spotify / Apple Music / YouTube Music (Chrome, Brave, Edge, Arc — enable View ▸ Developer ▸ Allow JavaScript from Apple Events) plays;
   hover for a player card with progress and prev / play / next.
+- **AI agent monitor**: Claude Code hooks report into ClipStack; the notch glows orange when an agent needs permission and
+  you Allow / Deny from the island (the agent waits). Sessions and their last action live in the Agents tab.
+- **Up Next**: next calendar events (with Join for Zoom/Meet/Teams) and today's reminders; the wing counts down 10 min before.
+- **System HUD** in the notch for volume, brightness and Caps Lock; **weather** in the island corner; a **Prompter** tab that
+  scrolls your last copied text; configurable **glow** tinted by album art / agent state.
 - **Shelf & Timers in the notch**: drop files on the notch to keep them on a shelf and drag them out into any app later;
   start a 5–60 min timer and watch the countdown ring in the notch wing, with a done banner (+5 min / Dismiss).
 - **Interactive notch** (Dynamic-Island style): sits over the MacBook notch, flashes what you just copied, expands on hover
@@ -58,6 +63,10 @@ For development: `swift run` (menu-bar icon appears; "Launch at login" is only a
 | `PreferencesWindow.swift` | Preferences window + hotkey recorder |
 | `HistoryView.swift` | Popover UI: list, preview pane, actions, quick-pick |
 | `ScreenshotWatcher.swift` | Spotlight watcher, organize/rename, Vision OCR |
+| `AgentMonitor.swift` | Local hook server for Claude Code, permission decisions, hook installer |
+| `CalendarMonitor.swift` | EventKit events/reminders, join-link detection |
+| `SystemHUD.swift` | Volume/brightness/Caps Lock watchers |
+| `Weather.swift` | CoreLocation + Open-Meteo |
 | `Shelf.swift` | Shelf store, notch timer, ring view |
 | `NowPlaying.swift` | Spotify / Music polling via Apple Events, audio-bars view |
 | `NotchWindow.swift` | Notch panel: shape, toast, hover-expand chips, drag & drop |

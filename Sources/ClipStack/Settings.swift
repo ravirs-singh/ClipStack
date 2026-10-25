@@ -52,6 +52,28 @@ enum Settings {
         set { d.set(newValue, forKey: "notchNowPlaying"); notify() }
     }
 
+    static var calendarEnabled: Bool {
+        get { d.object(forKey: "calendarEnabled") as? Bool ?? false }
+        set { d.set(newValue, forKey: "calendarEnabled"); notify() }
+    }
+    static var weatherEnabled: Bool {
+        get { d.object(forKey: "weatherEnabled") as? Bool ?? false }
+        set { d.set(newValue, forKey: "weatherEnabled"); notify() }
+    }
+    static var hudEnabled: Bool {
+        get { d.object(forKey: "hudEnabled") as? Bool ?? true }
+        set { d.set(newValue, forKey: "hudEnabled"); notify() }
+    }
+    static var agentsEnabled: Bool {
+        get { d.object(forKey: "agentsEnabled") as? Bool ?? true }
+        set { d.set(newValue, forKey: "agentsEnabled"); notify() }
+    }
+    /// 0 off · 1 subtle · 2 vivid
+    static var notchGlow: Int {
+        get { d.object(forKey: "notchGlow") as? Int ?? 1 }
+        set { d.set(newValue, forKey: "notchGlow"); notify() }
+    }
+
     // MARK: Screenshots
 
     static var screenshotsEnabled: Bool {

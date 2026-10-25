@@ -19,7 +19,7 @@ final class PreferencesWindowController: NSWindowController {
 
         tabs.tabStyle = .toolbar
         tabs.transitionOptions = []
-        panes = [GeneralPane(), CapturePane(), ScreenshotsPane(), NotchPane()]
+        panes = [GeneralPane(), CapturePane(), ScreenshotsPane(), NotchPane(), AgentsPane()]
         for pane in panes {
             let item = NSTabViewItem(viewController: pane)
             item.label = pane.paneTitle
@@ -289,6 +289,10 @@ final class NotchPane: PreferencePane {
     private lazy var toastCheck = checkbox("Flash what was just copied", #selector(changed))
     private lazy var shotCheck = checkbox("Drop down with actions after a screenshot", #selector(changed))
     private lazy var musicCheck = checkbox("Show Now Playing (Spotify, Apple Music, YouTube Music in Chrome)", #selector(changed))
+    private lazy var calCheck = checkbox("Show next calendar event and today's reminders", #selector(changed))
+    private lazy var weatherCheck = checkbox("Show the weather (uses your location)", #selector(changed))
+    private lazy var hudCheck = checkbox("Show volume, brightness and Caps Lock changes in the notch", #selector(changed))
+    private let glowPopup = NSPopUpButton()
 
     override func build() {
         row("Notch:", enableCheck)
@@ -298,6 +302,16 @@ final class NotchPane: PreferencePane {
         row(shotCheck)
         gap()
         row("Music:", musicCheck)
+        row("Up Next:", calCheck)
+        note("macOS will ask for Calendar and Reminders access the first time.")
+        row("Weather:", weatherCheck)
+        row("HUD:", hudCheck)
+        note("Apple's own overlay still appears; this adds a matching indicator in the notch.")
+        gap()
+        for t in ["Off", "Subtle", "Vivid"] { glowPopup.addItem(withTitle: t) }
+        glowPopup.target = self; glowPopup.action = #selector(glowChanged)
+        row("Glow:", glowPopup)
+        note("Tints the island's edge with the album art colour, orange when an agent needs you, amber while a timer runs.")
         note("Album art on the left of the notch, audio bars on the right; hover for controls. macOS will ask once to allow ClipStack to control each player.")
         note("For YouTube Music / YouTube in Chrome, Brave, Edge or Arc: enable View ▸ Developer ▸ “Allow JavaScript from Apple Events” in the browser once.")
     }
@@ -310,6 +324,11 @@ final class NotchPane: PreferencePane {
         shotCheck.isEnabled = Settings.notchEnabled
         musicCheck.state = Settings.notchNowPlaying ? .on : .off
         musicCheck.isEnabled = Settings.notchEnabled
+        calCheck.state = Settings.calendarEnabled ? .on : .off
+        weatherCheck.state = Settings.weatherEnabled ? .on : .off
+        hudCheck.state = Settings.hudEnabled ? .on : .off
+        glowPopup.selectItem(at: Settings.notchGlow)
+        [calCheck, weatherCheck, hudCheck, glowPopup].forEach { $0.isEnabled = Settings.notchEnabled }
     }
 
     @objc private func changed() {
@@ -317,7 +336,50 @@ final class NotchPane: PreferencePane {
         Settings.notchToasts = toastCheck.state == .on
         Settings.notchScreenshotToast = shotCheck.state == .on
         Settings.notchNowPlaying = musicCheck.state == .on
+        Settings.calendarEnabled = calCheck.state == .on
+        Settings.weatherEnabled = weatherCheck.state == .on
+        Settings.hudEnabled = hudCheck.state == .on
     }
+    @objc private func glowChanged() { Settings.notchGlow = glowPopup.indexOfSelectedItem }
+}
+
+// MARK: - Agents
+
+final class AgentsPane: PreferencePane {
+    override var paneTitle: String { "Agents" }
+    override var paneSymbol: String { "sparkles" }
+
+    private lazy var enableCheck = checkbox("Show AI agent activity in the notch", #selector(changed))
+    private let status = NSTextField(wrappingLabelWithString: "")
+    private lazy var installButton = smallButton("Install Claude Code Hooks", #selector(install))
+    private lazy var revealButton = smallButton("Show settings.json", #selector(reveal))
+
+    override func build() {
+        row("Agents:", enableCheck)
+        note("Claude Code reports what it's doing through hooks. When it needs permission for a command, the notch glows orange and you can Allow or Deny right there — the agent waits for your answer.")
+        gap()
+        status.font = .systemFont(ofSize: 12); status.preferredMaxLayoutWidth = 340
+        row("Claude Code:", status)
+        let btns = NSStackView(views: [installButton, revealButton]); btns.spacing = 8
+        row(btns)
+        note("Adds hook entries to ~/.claude/settings.json (a backup is kept). Codex and Cursor support is planned.")
+    }
+
+    override func refresh() {
+        enableCheck.state = Settings.agentsEnabled ? .on : .off
+        let ok = AgentMonitor.hooksInstalled
+        status.stringValue = ok ? "Hooks installed · listening on 127.0.0.1:\(AgentMonitor.port)" : "Hooks not installed"
+        status.textColor = ok ? .systemGreen : .secondaryLabelColor
+        installButton.title = ok ? "Reinstall Hooks" : "Install Claude Code Hooks"
+    }
+
+    @objc private func changed() { Settings.agentsEnabled = enableCheck.state == .on }
+    @objc private func install() {
+        do { try AgentMonitor.installHooks(); refresh() } catch {
+            let a = NSAlert(); a.messageText = "Couldn't write hooks"; a.informativeText = error.localizedDescription; a.runModal()
+        }
+    }
+    @objc private func reveal() { NSWorkspace.shared.activateFileViewerSelecting([AgentMonitor.settingsURL]) }
 }
 
 // MARK: - Hotkey recorder
