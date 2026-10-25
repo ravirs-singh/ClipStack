@@ -17,7 +17,7 @@ final class NotchController {
     private var notchSize = NSSize(width: 200, height: 32)
     private var hasRealNotch = false
 
-    private enum State { case collapsed, toast, shot, expanded }
+    private enum State { case collapsed, toast, shot, expanded, timerDone }
     private var state: State = .collapsed
     private var collapseTimer: Timer?
     private var hovering = false
@@ -27,6 +27,8 @@ final class NotchController {
     private let musicExtra: CGFloat = 84          // extra height for the player card when music is playing
     private let wing: CGFloat = 44                // width added each side of the notch for the now-playing hint
     private let nowPlaying = NowPlayingMonitor()
+    let shelf = ShelfStore()
+    let timer = NotchTimer()
     private var positionTimer: Timer?
     private var animToken = 0
     private let shotToastSize = NSSize(width: 520, height: 96)
@@ -44,6 +46,11 @@ final class NotchController {
         notchView.onOpenHistory = { [weak self] in self?.collapse(); self?.openHistory() }
         notchView.onDrop = { [weak self] in self?.handleDrop($0) ?? false }
         notchView.onShotAction = { [weak self] action, item in self?.shotAction(action, item) }
+        notchView.shelf = shelf
+        notchView.timer = timer
+        notchView.onTimerStart = { [weak self] min in self?.timer.start(minutes: min); self?.timerChanged() }
+        notchView.onTimerCancel = { [weak self] in self?.timer.cancel(); self?.timerChanged() }
+        notchView.onTimerAdd = { [weak self] min in self?.timer.add(minutes: min) }
         notchView.onMusic = { [weak self] cmd in
             switch cmd { case .playPause: self?.nowPlaying.playPause(); case .next: self?.nowPlaying.next(); case .previous: self?.nowPlaying.previous() }
         }
@@ -74,6 +81,15 @@ final class NotchController {
         })
         observers.append(NotificationCenter.default.addObserver(forName: NowPlayingMonitor.changed, object: nil, queue: .main) { [weak self] _ in
             self?.nowPlayingChanged()
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: ShelfStore.changed, object: nil, queue: .main) { [weak self] _ in
+            self?.notchView.rebuildShelf()
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NotchTimer.tick, object: nil, queue: .main) { [weak self] _ in
+            self?.notchView.needsLayout = true
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NotchTimer.finished, object: nil, queue: .main) { [weak self] _ in
+            self?.timerFinished()
         })
 
         applyEnabled()
@@ -112,9 +128,12 @@ final class NotchController {
         let size: NSSize
         switch state {
         case .collapsed:
-            let wings = notchView.nowPlaying != nil ? wing * 2 : 0
-            size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0) + wings, height: notchSize.height)
+            let music = notchView.nowPlaying != nil
+            let left: CGFloat = music ? wing : 0
+            let right: CGFloat = timer.isRunning ? 72 : (music ? wing : 0)
+            size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0) + left + right, height: notchSize.height)
         case .toast:     size = NSSize(width: max(notchSize.width + 240, 380), height: notchSize.height + 14)
+        case .timerDone: size = NSSize(width: max(notchSize.width + 260, 420), height: notchSize.height + 46)
         case .shot:      size = NSSize(width: max(shotToastSize.width, notchSize.width + 200), height: notchSize.height + shotToastSize.height)
         case .expanded:  size = NSSize(width: expandedSize.width, height: expandedSize.height + (notchView.nowPlaying != nil ? musicExtra : 0))
         }
@@ -130,6 +149,7 @@ final class NotchController {
             case .collapsed: return .collapsed
             case .toast: return .toast
             case .shot: return .shot
+            case .timerDone: return .timerDone
             case .expanded: return .expanded
             }
         }()
@@ -167,7 +187,7 @@ final class NotchController {
     private func mouseEntered() {
         hovering = true
         collapseTimer?.invalidate()
-        if state != .expanded && state != .shot { expand() }
+        if state != .expanded && state != .shot && state != .timerDone { expand() }
     }
 
     private func mouseExited() {
@@ -182,6 +202,17 @@ final class NotchController {
     private func expand() {
         notchView.items = Array(store.filtered("").prefix(6))
         setState(.expanded, animated: true)
+    }
+
+    // MARK: Timer
+
+    private func timerChanged() {
+        if state == .collapsed || state == .timerDone { setState(.collapsed, animated: true) } else { notchView.needsLayout = true }
+    }
+
+    private func timerFinished() {
+        setState(.timerDone, animated: true)
+        scheduleCollapse(after: 8)
     }
 
     // MARK: Now playing
@@ -252,6 +283,8 @@ final class NotchController {
     private func handleDrop(_ pb: NSPasteboard) -> Bool {
         let general = NSPasteboard.general
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
+            shelf.add(urls)
+            notchView.selectedTab = .shelf
             general.clearContents(); general.writeObjects(urls as [NSURL]); return true
         }
         if let s = pb.string(forType: .string) {
@@ -267,7 +300,14 @@ final class NotchController {
 // MARK: - View
 
 final class NotchView: NSView {
-    enum Mode { case collapsed, toast, shot, expanded }
+    enum Mode { case collapsed, toast, shot, expanded, timerDone }
+    enum Tab: Int { case clips, shelf, timer }
+    var selectedTab: Tab = .clips { didSet { needsLayout = true } }
+    weak var shelf: ShelfStore?
+    weak var timer: NotchTimer?
+    var onTimerStart: ((Double) -> Void)?
+    var onTimerCancel: (() -> Void)?
+    var onTimerAdd: ((Double) -> Void)?
     enum ShotAction { case copy, text, reveal, trash }
     enum MusicCommand { case playPause, next, previous }
     var onMusic: ((MusicCommand) -> Void)?
@@ -324,6 +364,24 @@ final class NotchView: NSView {
     private let nextButton = FirstClickButton()
     private var progressPosition: TimeInterval = 0
     private var musicViews: [NSView] { [cardArt, cardTitle, cardArtist, cardTime, prevButton, playButton, nextButton] }
+
+    // Tabs, shelf, timer
+    private let tabBar = NSStackView()
+    private var tabButtons: [FirstClickButton] = []
+    private let shelfStack = NSStackView()
+    private let shelfEmpty = NSTextField(labelWithString: "Drop files here to keep them handy")
+    private let shelfClear = FirstClickButton(title: "Clear", target: nil, action: nil)
+    private let timerPresets = NSStackView()
+    private let timerBig = NSTextField(labelWithString: "")
+    private let timerSub = NSTextField(labelWithString: "")
+    private let timerCancel = FirstClickButton(title: "Cancel", target: nil, action: nil)
+    private let timerPlus = FirstClickButton(title: "+5 min", target: nil, action: nil)
+    private let hintRing = RingView()
+    private let hintTime = NSTextField(labelWithString: "")
+    private let doneLabel = NSTextField(labelWithString: "Timer done")
+    private let doneRepeat = FirstClickButton(title: "+5 min", target: nil, action: nil)
+    private let doneDismiss = FirstClickButton(title: "Dismiss", target: nil, action: nil)
+    private var tabViews: [NSView] { [tabBar, chipsStack, shelfStack, shelfEmpty, shelfClear, timerPresets, timerBig, timerSub, timerCancel, timerPlus] }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -426,6 +484,43 @@ final class NotchView: NSView {
             b.tag = [MusicCommand.previous, .playPause, .next].firstIndex(of: cmd)!
         }
         ([hintArt, hintBars] + musicViews).forEach { $0.isHidden = true; content.addSubview($0) }
+
+        // tab strip
+        tabBar.orientation = .horizontal; tabBar.spacing = 4
+        for (i, title) in ["Clips", "Shelf", "Timer"].enumerated() {
+            let b = FirstClickButton(title: title, target: self, action: #selector(tabTapped(_:)))
+            b.isBordered = false; b.tag = i; b.wantsLayer = true
+            b.layer?.cornerRadius = 9; b.font = .systemFont(ofSize: 11, weight: .semibold)
+            b.contentTintColor = .white
+            b.widthAnchor.constraint(equalToConstant: 58).isActive = true
+            b.heightAnchor.constraint(equalToConstant: 20).isActive = true
+            tabButtons.append(b); tabBar.addArrangedSubview(b)
+        }
+        // shelf
+        shelfStack.orientation = .horizontal; shelfStack.spacing = 8; shelfStack.distribution = .fillEqually
+        shelfEmpty.textColor = NSColor.white.withAlphaComponent(0.45); shelfEmpty.font = .systemFont(ofSize: 11); shelfEmpty.alignment = .center
+        shelfClear.bezelStyle = .inline; shelfClear.controlSize = .small; shelfClear.contentTintColor = .white
+        shelfClear.target = self; shelfClear.action = #selector(shelfClearTapped)
+        // timer
+        timerPresets.orientation = .horizontal; timerPresets.spacing = 8; timerPresets.distribution = .fillEqually
+        for m in [5, 10, 15, 25, 45, 60] {
+            let b = FirstClickButton(title: "\(m) min", target: self, action: #selector(timerPresetTapped(_:)))
+            b.isBordered = false; b.tag = m; b.wantsLayer = true
+            b.layer?.cornerRadius = 14; b.layer?.cornerCurve = .continuous
+            b.layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor
+            b.layer?.borderWidth = 1; b.layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor
+            b.font = .systemFont(ofSize: 13, weight: .semibold); b.contentTintColor = .white
+            timerPresets.addArrangedSubview(b)
+        }
+        timerBig.font = .monospacedDigitSystemFont(ofSize: 40, weight: .semibold); timerBig.textColor = .white
+        timerSub.font = .systemFont(ofSize: 11); timerSub.textColor = NSColor.white.withAlphaComponent(0.55)
+        for b in [timerCancel, timerPlus, doneRepeat, doneDismiss] { b.bezelStyle = .inline; b.controlSize = .small; b.contentTintColor = .white; b.target = self }
+        timerCancel.action = #selector(timerCancelTapped); timerPlus.action = #selector(timerPlusTapped)
+        doneRepeat.action = #selector(timerPlusTapped); doneDismiss.action = #selector(doneDismissTapped)
+        hintTime.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold); hintTime.textColor = .white
+        doneLabel.font = .systemFont(ofSize: 14, weight: .semibold); doneLabel.textColor = .white
+        (tabViews + [hintRing, hintTime, doneLabel, doneRepeat, doneDismiss]).forEach { $0.isHidden = true; content.addSubview($0) }
+        rebuildShelf()
         cardTrack.isHidden = true; cardProgress.isHidden = true
 
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
@@ -459,17 +554,37 @@ final class NotchView: NSView {
             setExpandedVisible(false)
             setMusicCardVisible(false)
             let music = nowPlaying != nil
+            let timing = timer?.isRunning == true
             hintArt.isHidden = !music
-            hintBars.isHidden = !music
+            hintBars.isHidden = !music || timing
+            hintRing.isHidden = !timing; hintTime.isHidden = !timing
+            setDoneVisible(false)
             if music {
                 let s = cb.height - 10
                 hintArt.frame = NSRect(x: 10, y: 5, width: s, height: s)
                 hintBars.frame = NSRect(x: cb.width - 10 - 18, y: (cb.height - 14) / 2, width: 18, height: 14)
                 hintBars.isAnimating = nowPlaying?.isPlaying == true
             }
+            if timing, let tm = timer {
+                hintRing.frame = NSRect(x: cb.width - 10 - 18, y: (cb.height - 18) / 2, width: 18, height: 18)
+                hintRing.progress = tm.progress
+                hintTime.stringValue = NotchTimer.format(tm.remaining)
+                hintTime.sizeToFit()
+                hintTime.frame.origin = NSPoint(x: cb.width - 10 - 18 - 6 - hintTime.frame.width, y: (cb.height - hintTime.frame.height) / 2)
+            }
+        case .timerDone:
+            toastStack.isHidden = true; shotViews.forEach { $0.isHidden = true }
+            setExpandedVisible(false); setMusicCardVisible(false)
+            hintArt.isHidden = true; hintBars.isHidden = true; hintRing.isHidden = true; hintTime.isHidden = true
+            setDoneVisible(true)
+            doneLabel.sizeToFit(); doneLabel.frame.origin = NSPoint(x: padX, y: baseNotchSize.height + 12)
+            doneRepeat.sizeToFit(); doneDismiss.sizeToFit()
+            doneDismiss.frame.origin = NSPoint(x: cb.width - padX - doneDismiss.frame.width, y: baseNotchSize.height + 8)
+            doneRepeat.frame.origin = NSPoint(x: doneDismiss.frame.minX - 8 - doneRepeat.frame.width, y: baseNotchSize.height + 8)
         case .shot:
             toastStack.isHidden = true
             setExpandedVisible(false)
+            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false)
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             shotViews.forEach { $0.isHidden = false }
             let top = baseNotchSize.height + 10
@@ -482,6 +597,7 @@ final class NotchView: NSView {
         case .toast:
             shotViews.forEach { $0.isHidden = true }
             setExpandedVisible(false)
+            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false)
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             toastStack.isHidden = false
             let w = cb.width - padX * 2
@@ -513,10 +629,44 @@ final class NotchView: NSView {
                 nextButton.frame = NSRect(x: cx + 80, y: top + 14, width: 30, height: 28)
                 top += artS + 28
             }
-            header.frame = NSRect(x: padX, y: top, width: 200, height: 16)
+            hintRing.isHidden = true; hintTime.isHidden = true; setDoneVisible(false)
+            header.isHidden = true
+            tabBar.isHidden = false
+            tabBar.frame = NSRect(x: padX, y: top - 2, width: 190, height: 20)
+            for (i, b) in tabButtons.enumerated() {
+                let on = i == selectedTab.rawValue
+                b.layer?.backgroundColor = (on ? NSColor(white: 1, alpha: 0.18) : NSColor.clear).cgColor
+                b.contentTintColor = on ? .white : NSColor.white.withAlphaComponent(0.55)
+            }
             historyButton.sizeToFit()
             historyButton.frame.origin = NSPoint(x: cb.width - padX - historyButton.frame.width, y: top - 3)
-            chipsStack.frame = NSRect(x: padX, y: top + 24, width: cb.width - padX * 2, height: 72)
+            shelfClear.sizeToFit()
+            shelfClear.frame.origin = NSPoint(x: cb.width - padX - shelfClear.frame.width, y: top - 3)
+            let area = NSRect(x: padX, y: top + 26, width: cb.width - padX * 2, height: 72)
+            chipsStack.isHidden = selectedTab != .clips
+            historyButton.isHidden = selectedTab != .clips
+            let shelfOn = selectedTab == .shelf, shelfHas = !(shelf?.urls.isEmpty ?? true)
+            shelfStack.isHidden = !shelfOn || !shelfHas
+            shelfEmpty.isHidden = !shelfOn || shelfHas
+            shelfClear.isHidden = !shelfOn || !shelfHas
+            let timerOn = selectedTab == .timer, running = timer?.isRunning == true
+            timerPresets.isHidden = !timerOn || running
+            timerBig.isHidden = !timerOn || !running; timerSub.isHidden = timerBig.isHidden
+            timerCancel.isHidden = timerBig.isHidden; timerPlus.isHidden = timerBig.isHidden
+            chipsStack.frame = area
+            shelfStack.frame = area
+            shelfEmpty.frame = area
+            timerPresets.frame = NSRect(x: area.minX, y: area.minY + 14, width: area.width, height: 44)
+            if running, let tm = timer {
+                timerBig.stringValue = NotchTimer.format(tm.remaining); timerBig.sizeToFit()
+                timerBig.frame.origin = NSPoint(x: area.minX, y: area.minY + 8)
+                timerSub.stringValue = "of \(Int(tm.duration / 60)) min"; timerSub.sizeToFit()
+                timerSub.frame.origin = NSPoint(x: area.minX + timerBig.frame.width + 10, y: area.minY + 32)
+                timerCancel.sizeToFit(); timerPlus.sizeToFit()
+                timerCancel.frame.origin = NSPoint(x: area.maxX - timerCancel.frame.width, y: area.minY + 24)
+                timerPlus.frame.origin = NSPoint(x: timerCancel.frame.minX - 8 - timerPlus.frame.width, y: area.minY + 24)
+            }
+            dropHint.stringValue = selectedTab == .shelf ? "Drag a file out to use it anywhere" : "Drop files or text here to copy"
             dropHint.sizeToFit()
             dropHint.frame.origin = NSPoint(x: (cb.width - dropHint.frame.width) / 2, y: cb.height - 22)
         }
@@ -586,11 +736,31 @@ final class NotchView: NSView {
     }
 
     private func setExpandedVisible(_ v: Bool) {
-        header.isHidden = !v
+        header.isHidden = true
         historyButton.isHidden = !v
         chipsStack.isHidden = !v
         dropHint.isHidden = !v
+        if !v { tabViews.forEach { $0.isHidden = true } }
     }
+
+    private func setDoneVisible(_ v: Bool) { doneLabel.isHidden = !v; doneRepeat.isHidden = !v; doneDismiss.isHidden = !v }
+
+    func rebuildShelf() {
+        shelfStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for url in (shelf?.urls ?? []).prefix(6) {
+            let chip = ShelfChip(url: url)
+            chip.onRemove = { [weak self] in self?.shelf?.remove(url) }
+            shelfStack.addArrangedSubview(chip)
+        }
+        needsLayout = true
+    }
+
+    @objc private func tabTapped(_ sender: NSButton) { selectedTab = Tab(rawValue: sender.tag) ?? .clips }
+    @objc private func shelfClearTapped() { shelf?.clear() }
+    @objc private func timerPresetTapped(_ sender: NSButton) { onTimerStart?(Double(sender.tag)) }
+    @objc private func timerCancelTapped() { onTimerCancel?() }
+    @objc private func timerPlusTapped() { onTimerAdd?(5) }
+    @objc private func doneDismissTapped() { onTimerCancel?() }
 
     /// Flat top (hugs the screen edge), rounded bottom corners, small concave "ears" at the top like the real notch.
     private func notchPath(in b: NSRect) -> NSBezierPath {
@@ -678,6 +848,62 @@ final class NotchView: NSView {
         dragHighlight = false
         return onDrop?(sender.draggingPasteboard) ?? false
     }
+}
+
+/// A file on the shelf: icon + name; drag it out into any app, click to reveal, right-click to remove.
+final class ShelfChip: NSView, NSDraggingSource {
+    var onRemove: (() -> Void)?
+    private let url: URL
+    private var dragStart: NSPoint?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    init(url: URL) {
+        self.url = url
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor
+        layer?.cornerRadius = 14; layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1; layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor
+        let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: url.path))
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        let name = NSTextField(labelWithString: url.lastPathComponent)
+        name.textColor = .white; name.font = .systemFont(ofSize: 11); name.lineBreakMode = .byTruncatingMiddle
+        name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int).map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? ""
+        let sub = NSTextField(labelWithString: size)
+        sub.textColor = NSColor.white.withAlphaComponent(0.45); sub.font = .systemFont(ofSize: 9)
+        let v = NSStackView(views: [icon, name, sub])
+        v.orientation = .vertical; v.alignment = .leading; v.spacing = 3
+        v.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 6, right: 8)
+        v.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(v)
+        NSLayoutConstraint.activate([
+            v.topAnchor.constraint(equalTo: topAnchor), v.bottomAnchor.constraint(equalTo: bottomAnchor),
+            v.leadingAnchor.constraint(equalTo: leadingAnchor), v.trailingAnchor.constraint(equalTo: trailingAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 24), icon.heightAnchor.constraint(equalToConstant: 24),
+            name.widthAnchor.constraint(equalTo: v.widthAnchor, constant: -16),
+        ])
+        toolTip = url.path
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Reveal in Finder", action: #selector(reveal), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Remove from Shelf", action: #selector(remove), keyEquivalent: "").target = self
+        self.menu = menu
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func reveal() { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+    @objc private func remove() { onRemove?() }
+
+    override func mouseDown(with event: NSEvent) { dragStart = event.locationInWindow }
+    override func mouseUp(with event: NSEvent) { if dragStart != nil { reveal() }; dragStart = nil }
+    override func mouseDragged(with event: NSEvent) {
+        guard let start = dragStart, hypot(event.locationInWindow.x - start.x, event.locationInWindow.y - start.y) > 6 else { return }
+        dragStart = nil
+        let di = NSDraggingItem(pasteboardWriter: url as NSURL)
+        di.setDraggingFrame(bounds, contents: NSWorkspace.shared.icon(forFile: url.path))
+        beginDraggingSession(with: [di], event: event, source: self)
+    }
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
 }
 
 /// Plain container with top-left origin, matching NotchView.

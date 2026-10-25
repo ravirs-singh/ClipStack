@@ -22,6 +22,8 @@ A lightweight menu-bar clipboard history app written in Swift (pure AppKit — b
 - Filter bar: All / Text / Images / Screenshots / Files
 - **Now Playing in the notch**: album art on the left, animated audio bars on the right while Spotify / Apple Music / YouTube Music (Chrome, Brave, Edge, Arc — enable View ▸ Developer ▸ Allow JavaScript from Apple Events) plays;
   hover for a player card with progress and prev / play / next.
+- **Shelf & Timers in the notch**: drop files on the notch to keep them on a shelf and drag them out into any app later;
+  start a 5–60 min timer and watch the countdown ring in the notch wing, with a done banner (+5 min / Dismiss).
 - **Interactive notch** (Dynamic-Island style): sits over the MacBook notch, flashes what you just copied, expands on hover
   to show your last 6 clips as tappable chips (tap = paste), click to open full history, and accepts drag-and-drop of
   files/text/images straight into the clipboard. Macs without a notch get a small pill at the top of the screen.
@@ -56,6 +58,7 @@ For development: `swift run` (menu-bar icon appears; "Launch at login" is only a
 | `PreferencesWindow.swift` | Preferences window + hotkey recorder |
 | `HistoryView.swift` | Popover UI: list, preview pane, actions, quick-pick |
 | `ScreenshotWatcher.swift` | Spotlight watcher, organize/rename, Vision OCR |
+| `Shelf.swift` | Shelf store, notch timer, ring view |
 | `NowPlaying.swift` | Spotify / Music polling via Apple Events, audio-bars view |
 | `NotchWindow.swift` | Notch panel: shape, toast, hover-expand chips, drag & drop |
 | `AppDelegate.swift` | Status item, popover, wiring |

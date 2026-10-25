@@ -450,7 +450,10 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
     override func viewWillAppear() {
         super.viewWillAppear()
         searchField.stringValue = ""
+        filterControl.selectedSegment = 0
+        tableView.deselectAll(nil)          // always land on the most recent item when opened
         reload()
+        tableView.scrollRowToVisible(0)
         view.window?.makeFirstResponder(searchField)
         updateHint()
         // ⌘1–⌘9 quick-pick, ⇧⏎ plain paste — captured app-wide while the popover is open.
