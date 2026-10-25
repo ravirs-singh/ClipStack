@@ -36,7 +36,7 @@ final class GlassCard: NSView {
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 24; layer?.cornerCurve = .continuous; layer?.masksToBounds = true
+        layer?.cornerRadius = 20; layer?.cornerCurve = .continuous; layer?.masksToBounds = true
         layer?.borderWidth = 1
         grad.startPoint = CGPoint(x: 0.5, y: 0); grad.endPoint = CGPoint(x: 0.5, y: 1)
         layer?.insertSublayer(grad, at: 0)
@@ -84,10 +84,10 @@ final class PillButton: FirstClickButton {
         self.target = target; self.action = action
         isBordered = false
         wantsLayer = true
-        layer?.cornerRadius = 15
+        layer?.cornerRadius = 13
         restyle()
         sizeToFit()
-        setFrameSize(NSSize(width: frame.width + 22, height: 30))
+        setFrameSize(NSSize(width: frame.width + 18, height: 26))
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -96,7 +96,7 @@ final class PillButton: FirstClickButton {
         layer?.backgroundColor = (on ? NSColor.white : NSColor(white: 1, alpha: 0.07)).cgColor
         layer?.borderWidth = on ? 0 : 1
         layer?.borderColor = NSColor(white: 1, alpha: 0.2).cgColor
-        attributedTitle = Theme.attributed(titleText, size: 12, weight: .semibold, color: on ? NSColor(white: 0.08, alpha: 1) : .white)
+        attributedTitle = Theme.attributed(titleText, size: 11, weight: .semibold, color: on ? NSColor(white: 0.08, alpha: 1) : .white)
     }
 }
 
@@ -115,11 +115,11 @@ final class TabCapsule: NSView {
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 20; layer?.cornerCurve = .continuous
+        layer?.cornerRadius = 17; layer?.cornerCurve = .continuous
         layer?.backgroundColor = NSColor(white: 1, alpha: 0.07).cgColor
         layer?.borderWidth = 1; layer?.borderColor = NSColor(white: 1, alpha: 0.1).cgColor
         highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = 15; highlight.layer?.cornerCurve = .continuous
+        highlight.layer?.cornerRadius = 13; highlight.layer?.cornerCurve = .continuous
         highlight.layer?.backgroundColor = NSColor(white: 1, alpha: 0.14).cgColor
         highlight.layer?.borderWidth = 1; highlight.layer?.borderColor = NSColor(white: 1, alpha: 0.18).cgColor
         addSubview(highlight)
@@ -134,7 +134,7 @@ final class TabCapsule: NSView {
         for (i, it) in items.enumerated() {
             let b = FirstClickButton(title: "", target: self, action: #selector(tapped(_:)))
             b.isBordered = false; b.tag = i; b.imagePosition = .imageLeading
-            b.image = UI.symbol(it.symbol, size: 14, weight: .semibold)
+            b.image = UI.symbol(it.symbol, size: 13, weight: .semibold)
             b.contentTintColor = .white
             addSubview(b); buttons.append(b)
             let c = Theme.label("", size: 11, weight: .medium, color: Theme.dim)
@@ -152,32 +152,32 @@ final class TabCapsule: NSView {
 
     private func countText(_ i: Int) -> String { count(i) > 99 ? "99+" : "\(count(i))" }
     private func countWidth(_ i: Int) -> CGFloat { count(i) > 0 ? (countText(i) as NSString).size(withAttributes: [.font: Theme.font(11, .medium)]).width + 6 : 0 }
-    private func itemWidth(_ i: Int) -> CGFloat { 32 + countWidth(i) }
+    private func itemWidth(_ i: Int) -> CGFloat { 30 + countWidth(i) }
     private func selectedWidth(_ i: Int) -> CGFloat {
-        let t = (items[i].title as NSString).size(withAttributes: [.font: Theme.font(13, .semibold)]).width
-        return 44 + t + countWidth(i)
+        let t = (items[i].title as NSString).size(withAttributes: [.font: Theme.font(12, .semibold)]).width
+        return 40 + t + countWidth(i)
     }
     private func count(_ i: Int) -> Int { i < counts.count ? counts[i] : 0 }
 
     override func layout() {
         super.layout()
-        var x: CGFloat = 8
+        var x: CGFloat = 6
         for (i, b) in buttons.enumerated() {
             let sel = i == selected
             let w = sel ? selectedWidth(i) : itemWidth(i)
-            b.frame = NSRect(x: x, y: 5, width: w - countWidth(i), height: 30)
+            b.frame = NSRect(x: x, y: 4, width: w - countWidth(i), height: 26)
             b.alignment = .center
-            b.image = UI.symbol(items[i].symbol, size: 14, weight: .semibold)
+            b.image = UI.symbol(items[i].symbol, size: 13, weight: .semibold)
             b.contentTintColor = sel ? .white : NSColor(white: 1, alpha: 0.75)
-            b.attributedTitle = sel ? Theme.attributed(" " + items[i].title, size: 13, weight: .semibold, color: .white) : NSAttributedString(string: "")
+            b.attributedTitle = sel ? Theme.attributed(" " + items[i].title, size: 12, weight: .semibold, color: .white) : NSAttributedString(string: "")
             let c = countLabels[i]
             c.isHidden = count(i) == 0
             c.stringValue = countText(i)
             c.textColor = sel ? NSColor(white: 1, alpha: 0.7) : Theme.dim
             c.sizeToFit()
-            c.frame.origin = NSPoint(x: x + w - c.frame.width - 9, y: 5 + (30 - c.frame.height) / 2)
+            c.frame.origin = NSPoint(x: x + w - c.frame.width - 8, y: 4 + (26 - c.frame.height) / 2)
             if sel {
-                NSAnimationContext.runAnimationGroup { ctx in ctx.duration = 0.22; ctx.allowsImplicitAnimation = true; highlight.animator().frame = NSRect(x: x, y: 5, width: w, height: 30) }
+                NSAnimationContext.runAnimationGroup { ctx in ctx.duration = 0.22; ctx.allowsImplicitAnimation = true; highlight.animator().frame = NSRect(x: x, y: 4, width: w, height: 26) }
             }
             x += w + 4
         }
@@ -194,12 +194,12 @@ final class ListRow: NSView {
         let ring = NSView(); ring.wantsLayer = true; ring.layer?.cornerRadius = 10
         ring.layer?.borderWidth = 2.5; ring.layer?.borderColor = color.cgColor
         if filled { ring.layer?.backgroundColor = color.cgColor }
-        ring.frame = NSRect(x: 18, y: 15, width: 20, height: 20)
+        ring.frame = NSRect(x: 16, y: 13, width: 16, height: 16)
         addSubview(ring)
-        let t = Theme.label(title, size: 15, weight: .medium, color: .white); t.frame = NSRect(x: 54, y: 8, width: 0, height: 18); addSubview(t)
-        let s = Theme.label(subtitle, size: 12, color: Theme.dim); s.frame = NSRect(x: 54, y: 29, width: 0, height: 15); addSubview(s)
+        let t = Theme.label(title, size: 13, weight: .medium, color: .white); t.frame = NSRect(x: 44, y: 6, width: 0, height: 16); addSubview(t)
+        let s = Theme.label(subtitle, size: 11, color: Theme.dim); s.frame = NSRect(x: 44, y: 24, width: 0, height: 13); addSubview(s)
         titleField = t; subField = s
-        if let tag { let g = Theme.label(tag, size: 12, weight: .medium, color: tagColor); g.sizeToFit(); addSubview(g); tagField = g }
+        if let tag { let g = Theme.label(tag, size: 11, weight: .medium, color: tagColor); g.sizeToFit(); addSubview(g); tagField = g }
         if let button { addSubview(button); accessory = button }
         let sep = NSView(); sep.wantsLayer = true; sep.layer?.backgroundColor = NSColor(white: 1, alpha: 0.08).cgColor; addSubview(sep); separator = sep
     }
@@ -209,11 +209,11 @@ final class ListRow: NSView {
 
     override func layout() {
         super.layout()
-        var right = bounds.width - 18
+        var right = bounds.width - 16
         if let a = accessory { a.frame.origin = NSPoint(x: right - a.frame.width, y: (bounds.height - a.frame.height) / 2); right -= a.frame.width + 12 }
         if let g = tagField { g.frame.origin = NSPoint(x: right - g.frame.width, y: 10); right -= g.frame.width + 12 }
-        titleField.frame.size.width = right - 54; subField.frame.size.width = right - 54
-        separator.frame = NSRect(x: 18, y: bounds.height - 1, width: bounds.width - 36, height: 1)
+        titleField.frame.size.width = right - 44; subField.frame.size.width = right - 44
+        separator.frame = NSRect(x: 16, y: bounds.height - 1, width: bounds.width - 32, height: 1)
     }
 }
 
@@ -253,7 +253,7 @@ final class IslandContentView: NSView {
     private let tabs = TabCapsule()
     private let left = GlassCard(), right = GlassCard()
     private var homeCards: [GlassCard] = [GlassCard(), GlassCard(), GlassCard(), GlassCard()]
-    private let padX: CGFloat = 22
+    private let padX: CGFloat = 16
     private var prompterTimer: Timer?
     private var prompterRate: CGFloat = 1
     private var prompterScroll: NSScrollView?
@@ -279,15 +279,15 @@ final class IslandContentView: NSView {
     override func layout() {
         super.layout()
         let w = bounds.width, h = bounds.height
-        tabs.frame = NSRect(x: padX, y: 16, width: tabs.preferredWidth, height: 40)
-        let y0: CGFloat = 70, ch = h - y0 - 18
-        let gap: CGFloat = 12
+        tabs.frame = NSRect(x: padX, y: 12, width: tabs.preferredWidth, height: 34)
+        let y0: CGFloat = 56, ch = h - y0 - 14
+        let gap: CGFloat = 10
         if selectedTab == .home {
-            let widths: [CGFloat] = [292, 168, 184, w - padX * 2 - 292 - 168 - 184 - gap * 3]
+            let widths: [CGFloat] = [232, 134, 144, w - padX * 2 - 232 - 134 - 144 - gap * 3]
             var x = padX
             for (i, c) in homeCards.enumerated() { c.frame = NSRect(x: x, y: y0, width: widths[i], height: ch); x += widths[i] + gap }
         } else {
-            let lw: CGFloat = 250
+            let lw: CGFloat = 196
             left.frame = NSRect(x: padX, y: y0, width: lw, height: ch)
             right.frame = NSRect(x: padX + lw + gap, y: y0, width: w - padX * 2 - lw - gap, height: ch)
         }
@@ -329,26 +329,26 @@ final class IslandContentView: NSView {
 
     // Summary card helper: small label top-left, big numeral bottom-left, optional circle button top-right.
     private func summary(_ card: GlassCard, title: String, subtitle: String? = nil, big: String, bigSuffix: String? = nil, caption: String? = nil, button: NSView? = nil, dot: NSColor? = nil) {
-        let t = Theme.label(title, size: 13, color: Theme.secondary); card.addSubview(t)
+        let t = Theme.label(title, size: 12, color: Theme.secondary); card.addSubview(t)
         var s: NSTextField?
-        if let subtitle { let l = Theme.label(subtitle, size: 13, color: Theme.secondary); card.addSubview(l); s = l }
-        let b = Theme.label(big, size: big.count > 3 ? 48 : 64, weight: .light, color: .white); card.addSubview(b)
+        if let subtitle { let l = Theme.label(subtitle, size: 12, color: Theme.secondary); card.addSubview(l); s = l }
+        let b = Theme.label(big, size: big.count > 3 ? 34 : 50, weight: .light, color: .white); card.addSubview(b)
         var suf: NSTextField?
-        if let bigSuffix { let l = Theme.label(bigSuffix, size: 24, weight: .light, color: Theme.dim); card.addSubview(l); suf = l }
+        if let bigSuffix { let l = Theme.label(bigSuffix, size: 18, weight: .light, color: Theme.dim); card.addSubview(l); suf = l }
         var cap: NSTextField?
-        if let caption { let l = Theme.label(caption, size: 13, color: Theme.secondary); card.addSubview(l); cap = l }
+        if let caption { let l = Theme.label(caption, size: 12, color: Theme.secondary); card.addSubview(l); cap = l }
         var dv: NSView?
         if let dot { let v = NSView(); v.wantsLayer = true; v.layer?.cornerRadius = 4; v.layer?.backgroundColor = dot.cgColor; card.addSubview(v); dv = v }
         if let button { card.addSubview(button) }
         onLayout {
             let W = card.bounds.width, H = card.bounds.height
-            t.sizeToFit(); t.frame.origin = NSPoint(x: 22, y: 20)
-            s?.sizeToFit(); s?.frame.origin = NSPoint(x: 22, y: 38)
-            b.sizeToFit(); b.frame.origin = NSPoint(x: 18, y: H - 22 - (cap != nil ? 22 : 0) - b.frame.height)
-            suf?.sizeToFit(); suf?.frame.origin = NSPoint(x: b.frame.maxX + 2, y: b.frame.maxY - (suf?.frame.height ?? 0) - 12)
-            cap?.sizeToFit(); cap?.frame.origin = NSPoint(x: 22 + (dv != nil ? 14 : 0), y: H - 22 - (cap?.frame.height ?? 0))
-            dv?.frame = NSRect(x: 22, y: (cap?.frame.midY ?? 0) - 4, width: 8, height: 8)
-            if let button { button.frame.origin = NSPoint(x: W - 20 - button.frame.width, y: 18) }
+            t.sizeToFit(); t.frame.origin = NSPoint(x: 16, y: 14)
+            s?.sizeToFit(); s?.frame.origin = NSPoint(x: 16, y: 31)
+            b.sizeToFit(); b.frame.origin = NSPoint(x: 13, y: H - 16 - (cap != nil ? 18 : 0) - b.frame.height)
+            suf?.sizeToFit(); suf?.frame.origin = NSPoint(x: b.frame.maxX + 1, y: b.frame.maxY - (suf?.frame.height ?? 0) - 9)
+            cap?.sizeToFit(); cap?.frame.origin = NSPoint(x: 16 + (dv != nil ? 13 : 0), y: H - 16 - (cap?.frame.height ?? 0))
+            dv?.frame = NSRect(x: 16, y: (cap?.frame.midY ?? 0) - 3.5, width: 7, height: 7)
+            if let button { button.frame.origin = NSPoint(x: W - 14 - button.frame.width, y: 14) }
         }
     }
 
@@ -361,27 +361,27 @@ final class IslandContentView: NSView {
         let art = NSImageView(); art.wantsLayer = true; art.layer?.cornerRadius = 12; art.layer?.cornerCurve = .continuous; art.layer?.masksToBounds = true
         art.layer?.backgroundColor = NSColor(white: 1, alpha: 0.1).cgColor; art.imageScaling = .scaleProportionallyUpOrDown
         art.image = d.nowPlayingInfo?.artwork
-        let title = Theme.label(d.nowPlayingInfo?.title ?? "Nothing playing", size: 16, weight: .semibold, color: .white)
-        let sub = Theme.label(d.nowPlayingInfo.map { "\($0.artist) · \($0.source.rawValue == "Google Chrome" ? "YouTube" : $0.source.rawValue)" } ?? "Spotify, Music or YouTube Music", size: 12, color: Theme.secondary)
+        let title = Theme.label(d.nowPlayingInfo?.title ?? "Nothing playing", size: 14, weight: .semibold, color: .white)
+        let sub = Theme.label(d.nowPlayingInfo.map { "\($0.artist) · \($0.source.rawValue == "Google Chrome" ? "YouTube" : $0.source.rawValue)" } ?? "Spotify, Music or YouTube Music", size: 11, color: Theme.secondary)
         let track = NSView(); track.wantsLayer = true; track.layer?.backgroundColor = NSColor(white: 1, alpha: 0.18).cgColor; track.layer?.cornerRadius = 1.5
         let fill = NSView(); fill.wantsLayer = true; fill.layer?.backgroundColor = NSColor.white.cgColor; fill.layer?.cornerRadius = 1.5; track.addSubview(fill)
-        let prev = CircleButton(symbol: "backward.fill", size: 36, filled: false, target: self, action: #selector(musicPrev))
-        let play = CircleButton(symbol: d.nowPlayingInfo?.isPlaying == true ? "pause.fill" : "play.fill", size: 44, filled: true, target: self, action: #selector(musicPlay))
-        let next = CircleButton(symbol: "forward.fill", size: 36, filled: false, target: self, action: #selector(musicNext))
+        let prev = CircleButton(symbol: "backward.fill", size: 30, filled: false, target: self, action: #selector(musicPrev))
+        let play = CircleButton(symbol: d.nowPlayingInfo?.isPlaying == true ? "pause.fill" : "play.fill", size: 36, filled: true, target: self, action: #selector(musicPlay))
+        let next = CircleButton(symbol: "forward.fill", size: 30, filled: false, target: self, action: #selector(musicNext))
         [art, title, sub, track, prev, play, next].forEach { m.addSubview($0) }
         let enabled = d.nowPlayingInfo != nil
         [prev, play, next].forEach { $0.isEnabled = enabled; $0.alphaValue = enabled ? 1 : 0.35 }
         onLayout {
             let W = m.bounds.width, H = m.bounds.height
-            art.frame = NSRect(x: 20, y: 20, width: 64, height: 64)
-            title.frame = NSRect(x: 98, y: 26, width: W - 118, height: 20)
-            sub.frame = NSRect(x: 98, y: 50, width: W - 118, height: 16)
-            track.frame = NSRect(x: 20, y: 106, width: W - 40, height: 3)
+            art.frame = NSRect(x: 16, y: 16, width: 52, height: 52)
+            title.frame = NSRect(x: 78, y: 22, width: W - 94, height: 18)
+            sub.frame = NSRect(x: 78, y: 42, width: W - 94, height: 14)
+            track.frame = NSRect(x: 16, y: 86, width: W - 32, height: 3)
             let frac = CGFloat(d.nowPlayingInfo.map { $0.duration > 0 ? $0.position / $0.duration : 0 } ?? 0)
             fill.frame = NSRect(x: 0, y: 0, width: track.frame.width * frac, height: 3)
-            prev.frame.origin = NSPoint(x: 20, y: H - 20 - 36)
-            next.frame.origin = NSPoint(x: W - 20 - 36, y: H - 20 - 36)
-            play.frame.origin = NSPoint(x: W / 2 - 22, y: H - 20 - 44)
+            prev.frame.origin = NSPoint(x: 16, y: H - 16 - 30)
+            next.frame.origin = NSPoint(x: W - 16 - 30, y: H - 16 - 30)
+            play.frame.origin = NSPoint(x: W / 2 - 18, y: H - 16 - 36)
         }
         // Agent
         let a = homeCards[1]
@@ -400,7 +400,7 @@ final class IslandContentView: NSView {
         let u = homeCards[3]
         if let e = d.calendar.events.first {
             let f = DateFormatter(); f.dateFormat = "HH:mm"
-            let arrow = CircleButton(symbol: "arrow.up.right", size: 40, filled: true, target: self, action: #selector(joinFirst))
+            let arrow = CircleButton(symbol: "arrow.up.right", size: 32, filled: true, target: self, action: #selector(joinFirst))
             summary(u, title: "Up next", subtitle: CalendarMonitor.relative(e), big: f.string(from: e.start), caption: e.title, button: arrow, dot: .systemBlue)
         } else {
             summary(u, title: "Up next", subtitle: Settings.calendarEnabled ? "Nothing in 24 h" : "Calendar off", big: "--:--")
@@ -416,9 +416,9 @@ final class IslandContentView: NSView {
 
     private func buildClips(_ d: IslandDataSource) {
         pendingLayout = []
-        let open = CircleButton(symbol: "arrow.up.right", size: 40, filled: true, target: self, action: #selector(openHistoryTapped))
+        let open = CircleButton(symbol: "arrow.up.right", size: 32, filled: true, target: self, action: #selector(openHistoryTapped))
         summary(left, title: "Clipboard", subtitle: "\(d.totalItems) items kept", big: "\(d.todayItems)", caption: "copied today", button: open)
-        let hint = Theme.label("Tap to paste · ⌘1–6 · drag out", size: 12, color: Theme.dim); right.addSubview(hint)
+        let hint = Theme.label("Tap to paste · ⌘1–6 · drag out", size: 11, color: Theme.dim); right.addSubview(hint)
         let stack = NSStackView(); stack.orientation = .horizontal; stack.spacing = 10; stack.distribution = .fillEqually
         for (i, item) in d.recentItems.prefix(6).enumerated() {
             let chip = ChipView(item: item, index: i)
@@ -429,8 +429,8 @@ final class IslandContentView: NSView {
         right.addSubview(stack)
         onLayout {
             let W = self.right.bounds.width, H = self.right.bounds.height
-            hint.sizeToFit(); hint.frame.origin = NSPoint(x: 22, y: 20)
-            stack.frame = NSRect(x: 20, y: 48, width: W - 40, height: H - 68)
+            hint.sizeToFit(); hint.frame.origin = NSPoint(x: 16, y: 14)
+            stack.frame = NSRect(x: 14, y: 36, width: W - 28, height: H - 50)
         }
     }
 
@@ -438,13 +438,13 @@ final class IslandContentView: NSView {
 
     private func buildShelf(_ d: IslandDataSource) {
         pendingLayout = []
-        let clear = CircleButton(symbol: "trash", size: 40, filled: false, target: self, action: #selector(shelfClearTapped))
+        let clear = CircleButton(symbol: "trash", size: 32, filled: false, target: self, action: #selector(shelfClearTapped))
         clear.isHidden = d.shelfURLs.isEmpty
         summary(left, title: "Shelf", subtitle: "Drop files on the notch", big: "\(d.shelfURLs.count)", caption: d.shelfURLs.count == 1 ? "file" : "files", button: clear)
         if d.shelfURLs.isEmpty {
             let e = Theme.label("Drop files or folders anywhere on the notch. They wait here until you drag them out.", size: 13, color: Theme.dim)
             e.lineBreakMode = .byWordWrapping; e.maximumNumberOfLines = 3; right.addSubview(e)
-            onLayout { e.frame = NSRect(x: 22, y: 22, width: self.right.bounds.width - 44, height: 60) }
+            onLayout { e.frame = NSRect(x: 16, y: 16, width: self.right.bounds.width - 32, height: 50) }
             return
         }
         let stack = NSStackView(); stack.orientation = .horizontal; stack.spacing = 10; stack.distribution = .fillEqually
@@ -453,11 +453,11 @@ final class IslandContentView: NSView {
             stack.addArrangedSubview(c)
         }
         right.addSubview(stack)
-        let hint = Theme.label("Drag a file out to use it anywhere · right-click to remove", size: 12, color: Theme.dim); right.addSubview(hint)
+        let hint = Theme.label("Drag a file out to use it anywhere · right-click to remove", size: 11, color: Theme.dim); right.addSubview(hint)
         onLayout {
             let W = self.right.bounds.width, H = self.right.bounds.height
-            hint.sizeToFit(); hint.frame.origin = NSPoint(x: 22, y: 20)
-            stack.frame = NSRect(x: 20, y: 48, width: W - 40, height: H - 68)
+            hint.sizeToFit(); hint.frame.origin = NSPoint(x: 16, y: 14)
+            stack.frame = NSRect(x: 14, y: 36, width: W - 28, height: H - 50)
         }
     }
 
@@ -471,17 +471,17 @@ final class IslandContentView: NSView {
         if let p = d.agents.pending.first {
             right.highlighted = true
             let name = d.agents.sessions[p.sessionID]?.name ?? "Claude Code"
-            let t = Theme.label("\(name) wants to run \(p.tool)", size: 15, weight: .semibold, color: .white)
-            let cmd = NSTextField(wrappingLabelWithString: p.summary); cmd.font = .monospacedSystemFont(ofSize: 13, weight: .regular); cmd.textColor = Theme.secondary; cmd.maximumNumberOfLines = 3
+            let t = Theme.label("\(name) wants to run \(p.tool)", size: 14, weight: .semibold, color: .white)
+            let cmd = NSTextField(wrappingLabelWithString: p.summary); cmd.font = .monospacedSystemFont(ofSize: 12, weight: .regular); cmd.textColor = Theme.secondary; cmd.maximumNumberOfLines = 3
             let allow = PillButton("Allow", filled: true, target: self, action: #selector(allowTapped))
             let deny = PillButton("Deny", target: self, action: #selector(denyTapped))
             [t, cmd, allow, deny].forEach { right.addSubview($0) }
             onLayout {
                 let W = self.right.bounds.width, H = self.right.bounds.height
-                t.frame = NSRect(x: 22, y: 22, width: W - 44, height: 20)
-                cmd.frame = NSRect(x: 22, y: 50, width: W - 44, height: 60)
-                allow.frame.origin = NSPoint(x: 22, y: H - 22 - 30)
-                deny.frame.origin = NSPoint(x: 22 + allow.frame.width + 10, y: H - 22 - 30)
+                t.frame = NSRect(x: 16, y: 16, width: W - 32, height: 18)
+                cmd.frame = NSRect(x: 16, y: 40, width: W - 32, height: 50)
+                allow.frame.origin = NSPoint(x: 16, y: H - 16 - 26)
+                deny.frame.origin = NSPoint(x: 16 + allow.frame.width + 8, y: H - 16 - 26)
             }
             return
         }
@@ -489,7 +489,7 @@ final class IslandContentView: NSView {
         if sessions.isEmpty {
             let e = Theme.label(AgentMonitor.hooksInstalled ? "No agents running. Start a Claude Code session and it shows up here." : "Install the Claude Code hooks in Preferences › Agents.", size: 13, color: Theme.dim)
             e.lineBreakMode = .byWordWrapping; e.maximumNumberOfLines = 3; right.addSubview(e)
-            onLayout { e.frame = NSRect(x: 22, y: 22, width: self.right.bounds.width - 44, height: 60) }
+            onLayout { e.frame = NSRect(x: 16, y: 16, width: self.right.bounds.width - 32, height: 50) }
             return
         }
         var rows: [ListRow] = []
@@ -499,7 +499,7 @@ final class IslandContentView: NSView {
             right.addSubview(r); rows.append(r)
         }
         rows.last?.showsSeparator = false
-        onLayout { for (i, r) in rows.enumerated() { r.frame = NSRect(x: 0, y: 10 + CGFloat(i) * 50, width: self.right.bounds.width, height: 50) } }
+        onLayout { for (i, r) in rows.enumerated() { r.frame = NSRect(x: 0, y: 8 + CGFloat(i) * 44, width: self.right.bounds.width, height: 44) } }
     }
 
     // MARK: Up next
@@ -512,7 +512,7 @@ final class IslandContentView: NSView {
         if !Settings.calendarEnabled || items.isEmpty {
             let e = Theme.label(Settings.calendarEnabled ? "Nothing coming up in the next 24 hours." : "Turn on Up Next in Preferences › Notch to see events and reminders.", size: 13, color: Theme.dim)
             e.lineBreakMode = .byWordWrapping; e.maximumNumberOfLines = 3; right.addSubview(e)
-            onLayout { e.frame = NSRect(x: 22, y: 22, width: self.right.bounds.width - 44, height: 60) }
+            onLayout { e.frame = NSRect(x: 16, y: 16, width: self.right.bounds.width - 32, height: 50) }
             return
         }
         var rows: [ListRow] = []
@@ -522,14 +522,14 @@ final class IslandContentView: NSView {
             let sub = it.isReminder ? "Today" : "Today · \(f.string(from: it.start)) · \(CalendarMonitor.relative(it))"
             var btn: NSView?
             if !it.isReminder {
-                let b = CircleButton(symbol: it.joinURL != nil ? "video.fill" : "arrow.up.right", size: 32, filled: it.joinURL != nil, target: self, action: #selector(joinTapped(_:)))
+                let b = CircleButton(symbol: it.joinURL != nil ? "video.fill" : "arrow.up.right", size: 26, filled: it.joinURL != nil, target: self, action: #selector(joinTapped(_:)))
                 b.tag = i; btn = b
             }
             let r = ListRow(color: palette[i % 3], title: it.title, subtitle: sub, tag: it.isReminder ? "Reminder" : (it.location.isEmpty ? "Calendar" : it.location), tagColor: palette[i % 3], button: btn)
             right.addSubview(r); rows.append(r)
         }
         rows.last?.showsSeparator = false
-        onLayout { for (i, r) in rows.enumerated() { r.frame = NSRect(x: 0, y: 10 + CGFloat(i) * 56, width: self.right.bounds.width, height: 56) } }
+        onLayout { for (i, r) in rows.enumerated() { r.frame = NSRect(x: 0, y: 8 + CGFloat(i) * 48, width: self.right.bounds.width, height: 48) } }
     }
 
     // MARK: Prompter
@@ -542,21 +542,21 @@ final class IslandContentView: NSView {
         summary(left, title: "Teleprompter", subtitle: prompterTimer == nil ? "Ready" : "Rolling", big: "\(minutes)", bigSuffix: "min", caption: "\(words) words")
         let scroll = NSScrollView(); let tv = NSTextView()
         tv.isEditable = false; tv.drawsBackground = false
-        tv.textContainerInset = NSSize(width: 10, height: 40)
+        tv.textContainerInset = NSSize(width: 8, height: 28)
         tv.isVerticallyResizable = true; tv.isHorizontallyResizable = false; tv.autoresizingMask = [.width]; tv.textContainer?.widthTracksTextView = true
-        tv.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: [.font: Theme.font(24, .regular), .foregroundColor: NSColor.white, .paragraphStyle: { let p = NSMutableParagraphStyle(); p.lineSpacing = 10; return p }()]))
+        tv.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: [.font: Theme.font(19, .regular), .foregroundColor: NSColor.white, .paragraphStyle: { let p = NSMutableParagraphStyle(); p.lineSpacing = 7; return p }()]))
         scroll.documentView = tv; scroll.drawsBackground = false; scroll.hasVerticalScroller = false; scroll.borderType = .noBorder
         right.addSubview(scroll); prompterScroll = scroll; prompterText = tv
-        let play = CircleButton(symbol: prompterTimer == nil ? "play.fill" : "pause.fill", size: 44, filled: true, target: self, action: #selector(prompterPlay))
-        let reset = CircleButton(symbol: "arrow.counterclockwise", size: 36, filled: false, target: self, action: #selector(prompterReset))
+        let play = CircleButton(symbol: prompterTimer == nil ? "play.fill" : "pause.fill", size: 34, filled: true, target: self, action: #selector(prompterPlay))
+        let reset = CircleButton(symbol: "arrow.counterclockwise", size: 28, filled: false, target: self, action: #selector(prompterReset))
         let speed = PillButton("\(String(format: "%.1f", prompterRate))×  ", target: self, action: #selector(prompterSpeed))
         [play, reset, speed].forEach { right.addSubview($0) }
         onLayout {
             let W = self.right.bounds.width, H = self.right.bounds.height
-            scroll.frame = NSRect(x: 16, y: 10, width: W - 32, height: H - 80)
-            play.frame.origin = NSPoint(x: 22, y: H - 22 - 44)
-            reset.frame.origin = NSPoint(x: 76, y: H - 22 - 40)
-            speed.frame.origin = NSPoint(x: W - 22 - speed.frame.width, y: H - 22 - 37)
+            scroll.frame = NSRect(x: 12, y: 6, width: W - 24, height: H - 60)
+            play.frame.origin = NSPoint(x: 16, y: H - 14 - 34)
+            reset.frame.origin = NSPoint(x: 58, y: H - 14 - 31)
+            speed.frame.origin = NSPoint(x: W - 16 - speed.frame.width, y: H - 14 - 30)
         }
     }
 
@@ -570,15 +570,15 @@ final class IslandContentView: NSView {
         let running = t.isRunning
         let remaining = running ? t.remaining : (pomodoroMode ? 25 * 60 : 15 * 60)
         let mm = Int(remaining.rounded(.up)) / 60, ss = Int(remaining.rounded(.up)) % 60
-        let play = CircleButton(symbol: running ? "stop.fill" : "play.fill", size: 48, filled: true, target: self, action: #selector(focusToggle))
+        let play = CircleButton(symbol: running ? "stop.fill" : "play.fill", size: 38, filled: true, target: self, action: #selector(focusToggle))
         summary(left, title: pomodoroMode ? "Pomodoro" : "Timer", subtitle: running ? "Running" : "Ready", big: "\(mm)", bigSuffix: String(format: ":%02d", ss),
                 caption: pomodoroMode ? "Focus" : "Countdown", button: play, dot: Theme.accent)
         // right: mode pills + end time + progress line + session dots
         let pomo = PillButton("Pomodoro", target: self, action: #selector(modePomodoro)); pomo.isOn = pomodoroMode
         let plain = PillButton("Timer", target: self, action: #selector(modeTimer)); plain.isOn = !pomodoroMode
-        let endLabel = Theme.label("Would end at", size: 13, color: Theme.secondary)
+        let endLabel = Theme.label("Would end at", size: 12, color: Theme.secondary)
         let f = DateFormatter(); f.dateFormat = "HH:mm"
-        let endTime = Theme.label(f.string(from: Date().addingTimeInterval(remaining)), size: 44, weight: .light, color: .white)
+        let endTime = Theme.label(f.string(from: Date().addingTimeInterval(remaining)), size: 34, weight: .light, color: .white)
         let line = NSView(); line.wantsLayer = true; line.layer?.backgroundColor = NSColor(white: 1, alpha: 0.2).cgColor; line.layer?.cornerRadius = 1
         let fill = NSView(); fill.wantsLayer = true; fill.layer?.backgroundColor = NSColor.white.cgColor; fill.layer?.cornerRadius = 1
         [pomo, plain, endLabel, endTime, line, fill].forEach { right.addSubview($0) }
@@ -586,13 +586,13 @@ final class IslandContentView: NSView {
         let total = running ? t.duration : remaining
         let tickEvery: Double = total > 1800 ? 15 : 5
         var m = 0.0
-        while m <= total / 60 + 0.01 { let l = Theme.label("\(Int(m))", size: 11, color: Theme.dim); right.addSubview(l); ticks.append(l); m += tickEvery }
+        while m <= total / 60 + 0.01 { let l = Theme.label("\(Int(m))", size: 10, color: Theme.dim); right.addSubview(l); ticks.append(l); m += tickEvery }
         var presets: [PillButton] = []
         if !pomodoroMode && !running {
             for mins in [5, 10, 15, 25, 45, 60] { let b = PillButton("\(mins) min", target: self, action: #selector(presetTapped(_:))); b.tag = mins; right.addSubview(b); presets.append(b) }
         }
         var dots: [NSView] = []
-        let bottom = Theme.label(pomodoroMode ? "Focus · session \(min(4, d.pomodoroSessions + 1)) / 4" : (running ? "Counting down" : "Pick a length"), size: 13, color: Theme.secondary)
+        let bottom = Theme.label(pomodoroMode ? "Focus · session \(min(4, d.pomodoroSessions + 1)) / 4" : (running ? "Counting down" : "Pick a length"), size: 12, color: Theme.secondary)
         right.addSubview(bottom)
         if pomodoroMode {
             for i in 0..<4 { let v = NSView(); v.wantsLayer = true; v.layer?.cornerRadius = 5; v.layer?.borderWidth = 1.5
@@ -605,18 +605,18 @@ final class IslandContentView: NSView {
         if let plus { right.addSubview(plus) }
         onLayout {
             let W = self.right.bounds.width, H = self.right.bounds.height
-            pomo.frame.origin = NSPoint(x: 22, y: 18); plain.frame.origin = NSPoint(x: 22 + pomo.frame.width + 8, y: 18)
-            endLabel.sizeToFit(); endLabel.frame.origin = NSPoint(x: 22, y: 64)
-            endTime.sizeToFit(); endTime.frame.origin = NSPoint(x: 20, y: 80)
-            line.frame = NSRect(x: 22, y: H - 62, width: W - 44, height: 2)
+            pomo.frame.origin = NSPoint(x: 16, y: 14); plain.frame.origin = NSPoint(x: 16 + pomo.frame.width + 6, y: 14)
+            endLabel.sizeToFit(); endLabel.frame.origin = NSPoint(x: 16, y: 50)
+            endTime.sizeToFit(); endTime.frame.origin = NSPoint(x: 14, y: 64)
+            line.frame = NSRect(x: 16, y: H - 50, width: W - 32, height: 2)
             let frac = CGFloat(running ? t.progress : 0)
-            fill.frame = NSRect(x: 22, y: H - 62, width: (W - 44) * frac, height: 2)
-            for (i, l) in ticks.enumerated() { l.sizeToFit(); let x = 22 + (W - 44) * CGFloat(Double(i) * tickEvery) / CGFloat(max(1, total / 60)); l.frame.origin = NSPoint(x: min(W - 22 - l.frame.width, x - l.frame.width / 2), y: H - 54) }
-            bottom.sizeToFit(); bottom.frame.origin = NSPoint(x: dots.isEmpty ? 22 : 22 + 4 * 18, y: H - 22 - bottom.frame.height)
-            for (i, v) in dots.enumerated() { v.frame = NSRect(x: 22 + CGFloat(i) * 18, y: bottom.frame.midY - 5, width: 10, height: 10) }
-            var px: CGFloat = W - 22
-            for b in presets.reversed() { px -= b.frame.width; b.frame.origin = NSPoint(x: px, y: 18); px -= 8 }
-            if let plus { plus.frame.origin = NSPoint(x: W - 22 - plus.frame.width, y: 18) }
+            fill.frame = NSRect(x: 16, y: H - 50, width: (W - 32) * frac, height: 2)
+            for (i, l) in ticks.enumerated() { l.sizeToFit(); let x = 16 + (W - 32) * CGFloat(Double(i) * tickEvery) / CGFloat(max(1, total / 60)); l.frame.origin = NSPoint(x: min(W - 16 - l.frame.width, x - l.frame.width / 2), y: H - 44) }
+            bottom.sizeToFit(); bottom.frame.origin = NSPoint(x: dots.isEmpty ? 16 : 16 + 4 * 16, y: H - 14 - bottom.frame.height)
+            for (i, v) in dots.enumerated() { v.frame = NSRect(x: 16 + CGFloat(i) * 16, y: bottom.frame.midY - 4.5, width: 9, height: 9) }
+            var px: CGFloat = W - 16
+            for b in presets.reversed() { px -= b.frame.width; b.frame.origin = NSPoint(x: px, y: 14); px -= 6 }
+            if let plus { plus.frame.origin = NSPoint(x: W - 16 - plus.frame.width, y: 14) }
         }
     }
 
