@@ -66,9 +66,16 @@ class PreferencePane: NSViewController {
             grid.column(at: 0).xPlacement = .trailing
             grid.column(at: 0).width = 150
         }
-        observer = NotificationCenter.default.addObserver(forName: Settings.changed, object: nil, queue: .main) { [weak self] _ in self?.refresh() }
+        observer = NotificationCenter.default.addObserver(forName: Settings.changed, object: nil, queue: .main) { [weak self] _ in
+            guard let self, !self.applying else { return }
+            self.refresh()
+        }
         refresh()
     }
+
+    /// Set while a pane writes several settings in a row, so the change notifications don't refresh half-written state.
+    var applying = false
+    func apply(_ block: () -> Void) { applying = true; block(); applying = false; refresh() }
 
     override func viewWillAppear() { super.viewWillAppear(); refresh() }
 
@@ -267,9 +274,11 @@ final class ScreenshotsPane: PreferencePane {
     }
 
     @objc private func changed() {
-        Settings.screenshotsEnabled = enableCheck.state == .on
-        Settings.screenshotOCR = ocrCheck.state == .on
-        Settings.screenshotOrganize = organizeCheck.state == .on
+        apply {
+            Settings.screenshotsEnabled = enableCheck.state == .on
+            Settings.screenshotOCR = ocrCheck.state == .on
+            Settings.screenshotOrganize = organizeCheck.state == .on
+        }
     }
     @objc private func chooseFolder() {
         let p = NSOpenPanel()
@@ -336,14 +345,16 @@ final class NotchPane: PreferencePane {
     }
 
     @objc private func changed() {
-        Settings.notchEnabled = enableCheck.state == .on
-        Settings.notchToasts = toastCheck.state == .on
-        Settings.notchScreenshotToast = shotCheck.state == .on
-        Settings.notchNowPlaying = musicCheck.state == .on
-        Settings.calendarEnabled = calCheck.state == .on
-        Settings.weatherEnabled = weatherCheck.state == .on
-        Settings.hudEnabled = hudCheck.state == .on
-        Settings.hudReplaceSystem = hudReplaceCheck.state == .on
+        apply {
+            Settings.notchEnabled = enableCheck.state == .on
+            Settings.notchToasts = toastCheck.state == .on
+            Settings.notchScreenshotToast = shotCheck.state == .on
+            Settings.notchNowPlaying = musicCheck.state == .on
+            Settings.calendarEnabled = calCheck.state == .on
+            Settings.weatherEnabled = weatherCheck.state == .on
+            Settings.hudEnabled = hudCheck.state == .on
+            Settings.hudReplaceSystem = hudReplaceCheck.state == .on
+        }
     }
     @objc private func glowChanged() { Settings.notchGlow = glowPopup.indexOfSelectedItem }
 }

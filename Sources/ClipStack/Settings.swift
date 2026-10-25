@@ -61,7 +61,7 @@ enum Settings {
         set { d.set(newValue, forKey: "weatherEnabled"); notify() }
     }
     static var hudEnabled: Bool {
-        get { d.object(forKey: "hudEnabled") as? Bool ?? true }
+        get { d.object(forKey: "hudEnabled") as? Bool ?? false }
         set { d.set(newValue, forKey: "hudEnabled"); notify() }
     }
     /// Unload Apple's volume/brightness overlay while ClipStack runs (restored on quit).
