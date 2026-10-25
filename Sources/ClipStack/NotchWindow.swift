@@ -1086,7 +1086,7 @@ final class NotchView: NSView {
 
     /// Flat top (hugs the screen edge), rounded bottom corners, small concave "ears" at the top like the real notch.
     private func notchPath(in b: NSRect) -> NSBezierPath {
-        let r: CGFloat = mode == .collapsed ? (hasRealNotch ? 10 : 12) : 22
+        let r: CGFloat = mode == .collapsed ? (hasRealNotch ? 10 : 12) : (mode == .expanded ? 36 : 22)
         let ear: CGFloat = hasRealNotch ? 6 : 0
         let p = NSBezierPath()
         p.move(to: NSPoint(x: b.minX, y: b.minY))

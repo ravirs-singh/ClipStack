@@ -150,10 +150,12 @@ final class TabCapsule: NSView {
         return w + 6
     }
 
-    private func itemWidth(_ i: Int) -> CGFloat { 30 + (count(i) > 0 ? 14 : 0) }
+    private func countText(_ i: Int) -> String { count(i) > 99 ? "99+" : "\(count(i))" }
+    private func countWidth(_ i: Int) -> CGFloat { count(i) > 0 ? (countText(i) as NSString).size(withAttributes: [.font: Theme.font(11, .medium)]).width + 6 : 0 }
+    private func itemWidth(_ i: Int) -> CGFloat { 32 + countWidth(i) }
     private func selectedWidth(_ i: Int) -> CGFloat {
         let t = (items[i].title as NSString).size(withAttributes: [.font: Theme.font(13, .semibold)]).width
-        return 40 + t + (count(i) > 0 ? 16 : 0)
+        return 44 + t + countWidth(i)
     }
     private func count(_ i: Int) -> Int { i < counts.count ? counts[i] : 0 }
 
@@ -163,16 +165,17 @@ final class TabCapsule: NSView {
         for (i, b) in buttons.enumerated() {
             let sel = i == selected
             let w = sel ? selectedWidth(i) : itemWidth(i)
-            b.frame = NSRect(x: x, y: 5, width: w, height: 30)
+            b.frame = NSRect(x: x, y: 5, width: w - countWidth(i), height: 30)
+            b.alignment = .center
             b.image = UI.symbol(items[i].symbol, size: 14, weight: .semibold)
             b.contentTintColor = sel ? .white : NSColor(white: 1, alpha: 0.75)
             b.attributedTitle = sel ? Theme.attributed(" " + items[i].title, size: 13, weight: .semibold, color: .white) : NSAttributedString(string: "")
             let c = countLabels[i]
             c.isHidden = count(i) == 0
-            c.stringValue = "\(count(i))"
+            c.stringValue = countText(i)
             c.textColor = sel ? NSColor(white: 1, alpha: 0.7) : Theme.dim
             c.sizeToFit()
-            c.frame.origin = NSPoint(x: x + w - c.frame.width - 7, y: 5 + (30 - c.frame.height) / 2)
+            c.frame.origin = NSPoint(x: x + w - c.frame.width - 9, y: 5 + (30 - c.frame.height) / 2)
             if sel {
                 NSAnimationContext.runAnimationGroup { ctx in ctx.duration = 0.22; ctx.allowsImplicitAnimation = true; highlight.animator().frame = NSRect(x: x, y: 5, width: w, height: 30) }
             }
@@ -329,7 +332,7 @@ final class IslandContentView: NSView {
         let t = Theme.label(title, size: 13, color: Theme.secondary); card.addSubview(t)
         var s: NSTextField?
         if let subtitle { let l = Theme.label(subtitle, size: 13, color: Theme.secondary); card.addSubview(l); s = l }
-        let b = Theme.label(big, size: 64, weight: .light, color: .white); card.addSubview(b)
+        let b = Theme.label(big, size: big.count > 3 ? 48 : 64, weight: .light, color: .white); card.addSubview(b)
         var suf: NSTextField?
         if let bigSuffix { let l = Theme.label(bigSuffix, size: 24, weight: .light, color: Theme.dim); card.addSubview(l); suf = l }
         var cap: NSTextField?
@@ -391,7 +394,7 @@ final class IslandContentView: NSView {
         if let r = d.weather.reading {
             summary(w, title: r.place.isEmpty ? "Weather" : r.place, subtitle: Self.condition(r.code), big: "\(Int(r.tempC.rounded()))", bigSuffix: "°")
         } else {
-            summary(w, title: "Weather", subtitle: Settings.weatherEnabled ? "Locating…" : "Off", big: "–")
+            summary(w, title: "Weather", subtitle: Settings.weatherEnabled ? "Locating…" : "Off", big: "--", bigSuffix: "°")
         }
         // Up next
         let u = homeCards[3]
@@ -400,7 +403,7 @@ final class IslandContentView: NSView {
             let arrow = CircleButton(symbol: "arrow.up.right", size: 40, filled: true, target: self, action: #selector(joinFirst))
             summary(u, title: "Up next", subtitle: CalendarMonitor.relative(e), big: f.string(from: e.start), caption: e.title, button: arrow, dot: .systemBlue)
         } else {
-            summary(u, title: "Up next", subtitle: Settings.calendarEnabled ? "Nothing in 24 h" : "Calendar off", big: "–")
+            summary(u, title: "Up next", subtitle: Settings.calendarEnabled ? "Nothing in 24 h" : "Calendar off", big: "--:--")
         }
     }
 
