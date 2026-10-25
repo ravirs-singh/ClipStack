@@ -381,7 +381,12 @@ final class AgentsPane: PreferencePane {
 
     @objc private func changed() { Settings.agentsEnabled = enableCheck.state == .on }
     @objc private func install() {
-        do { try AgentMonitor.installHooks(); refresh() } catch {
+        do {
+            try AgentMonitor.installHooks(); refresh()
+            let a = NSAlert(); a.messageText = "Hooks installed"
+            a.informativeText = "Claude Code will report to ClipStack from its next session. Restart any session that's already running."
+            a.runModal()
+        } catch {
             let a = NSAlert(); a.messageText = "Couldn't write hooks"; a.informativeText = error.localizedDescription; a.runModal()
         }
     }

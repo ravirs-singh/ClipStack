@@ -164,7 +164,7 @@ final class AgentMonitor {
 
     static var hooksInstalled: Bool {
         guard let d = try? Data(contentsOf: settingsURL), let s = String(data: d, encoding: .utf8) else { return false }
-        return s.contains("127.0.0.1:\(port)/permission")
+        return s.contains("127.0.0.1:\(port)")
     }
 
     /// Merges our hooks into ~/.claude/settings.json (backing the file up first). Existing hooks are kept.
@@ -192,7 +192,7 @@ final class AgentMonitor {
         hooks["PermissionRequest"] = permList
         root["hooks"] = hooks
         try fm.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let out = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        let out = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try out.write(to: settingsURL)
     }
 }
