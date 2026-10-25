@@ -28,7 +28,25 @@ enum Paster {
                 pb.writeObjects([src as NSURL, full] as [NSPasteboardWriting])
             } else if let img = item.image { pb.writeObjects([img]) }
         case .files:
-            pb.writeObjects(item.fileURLs as [NSURL])
+            let urls = item.fileURLs.filter { FileManager.default.fileExists(atPath: $0.path) }
+            guard !urls.isEmpty else { NSSound.beep(); NSLog("ClipStack: file clip no longer exists on disk"); return }
+            // One pasteboard item per file. For a single image, also carry the pixels so browsers,
+            // Messages and chat composers (which ignore file references) accept the paste.
+            var items: [NSPasteboardItem] = []
+            for u in urls {
+                let pi = NSPasteboardItem()
+                pi.setString(u.absoluteString, forType: .fileURL)
+                if urls.count == 1, let img = NSImage(contentsOf: u), let tiff = img.tiffRepresentation {
+                    pi.setData(tiff, forType: .tiff)
+                    if let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) { pi.setData(png, forType: .png) }
+                }
+                items.append(pi)
+            }
+            pb.writeObjects(items)
+            // Legacy filenames list — some apps (and AppleScript-era code) still read only this.
+            let legacy = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+            pb.addTypes([legacy], owner: nil)
+            pb.setPropertyList(urls.map(\.path), forType: legacy)
         }
     }
 

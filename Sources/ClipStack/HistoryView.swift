@@ -587,9 +587,17 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
             }
 
         case .files:
-            previewText.string = (item.filePaths ?? []).joined(separator: "\n")
-            previewText.font = .systemFont(ofSize: 12)
-            previewText.textColor = .labelColor
+            let out = NSMutableAttributedString()
+            for (i, p) in (item.filePaths ?? []).enumerated() {
+                let exists = FileManager.default.fileExists(atPath: p)
+                let size = (try? FileManager.default.attributesOfItem(atPath: p)[.size] as? Int).map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) }
+                let name = NSAttributedString(string: (p as NSString).lastPathComponent + "\n", attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .semibold), .foregroundColor: exists ? NSColor.labelColor : NSColor.systemRed])
+                let detail = NSAttributedString(string: (exists ? (size.map { $0 + " · " } ?? "") : "Missing · ") + (p as NSString).deletingLastPathComponent + (i < (item.filePaths?.count ?? 0) - 1 ? "\n\n" : ""),
+                                                attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor])
+                out.append(name); out.append(detail)
+            }
+            previewText.textStorage?.setAttributedString(out)
+            if (item.filePaths ?? []).contains(where: { !FileManager.default.fileExists(atPath: $0) }) { meta.append("file missing") }
             meta.append("\(item.filePaths?.count ?? 0) file\(item.filePaths?.count == 1 ? "" : "s")")
             openButton.title = "Reveal"
             openButton.isHidden = false
