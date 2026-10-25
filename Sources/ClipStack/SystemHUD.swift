@@ -1,5 +1,6 @@
 import AppKit
 import CoreAudio
+import AudioToolbox
 
 /// Watches output volume, display brightness and Caps Lock so the notch can show a HUD when they change.
 /// No key interception needed: volume uses a CoreAudio property listener, brightness is polled.

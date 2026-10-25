@@ -16,6 +16,7 @@ let package = Package(
                 .linkedFramework("EventKit"),
                 .linkedFramework("CoreLocation"),
                 .linkedFramework("CoreAudio"),
+                .linkedFramework("AudioToolbox"),
                 .linkedFramework("Network"),
             ]
         )
