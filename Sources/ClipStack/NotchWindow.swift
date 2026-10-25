@@ -232,6 +232,7 @@ final class NotchController {
     private func mouseEntered() {
         hovering = true
         collapseTimer?.invalidate()
+        if agents.waiting && state != .expanded && state != .agentAsk { setState(.agentAsk, animated: true); return }
         if state != .expanded && state != .shot && state != .timerDone && state != .agentAsk { expand() }
     }
 
@@ -241,11 +242,14 @@ final class NotchController {
     }
 
     private func clicked() {
+        if agents.waiting && state != .agentAsk && state != .expanded { setState(.agentAsk, animated: true); return }
+        if state == .agentAsk { notchView.selectedTab = .agents; expand(); return }
         if state == .expanded { collapse(); openHistory() } else { expand() }
     }
 
     private func expand() {
         notchView.items = Array(store.filtered("").prefix(6))
+        if agents.waiting { notchView.selectedTab = .agents }
         setState(.expanded, animated: true)
     }
 
@@ -286,6 +290,7 @@ final class NotchController {
     private func agentAsk() {
         guard Settings.agentsEnabled, Settings.notchEnabled else { return }
         notchView.needsLayout = true
+        NSSound(named: "Tink")?.play()
         if state == .expanded { notchView.selectedTab = .agents; setState(.expanded, animated: true); return }
         setState(.agentAsk, animated: true)
         scheduleCollapse(after: 25)
