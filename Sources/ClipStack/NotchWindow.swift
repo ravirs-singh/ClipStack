@@ -16,6 +16,7 @@ final class NotchController {
     private var screen: NSScreen?
     private var notchSize = NSSize(width: 200, height: 32)
     private var hasRealNotch = false
+    private var notchCenterX: CGFloat = 0
 
     private enum State { case collapsed, toast, shot, expanded, timerDone, hud, agentAsk }
     private var state: State = .collapsed
@@ -147,9 +148,11 @@ final class NotchController {
         let inset = screen.safeAreaInsets.top
         hasRealNotch = inset > 0
         if hasRealNotch, let l = screen.auxiliaryTopLeftArea, let r = screen.auxiliaryTopRightArea {
-            notchSize = NSSize(width: screen.frame.width - l.width - r.width, height: inset)
+            notchSize = NSSize(width: r.minX - l.maxX, height: inset)
+            notchCenterX = (l.maxX + r.minX) / 2
         } else {
             notchSize = NSSize(width: 180, height: NSStatusBar.system.thickness)
+            notchCenterX = screen.frame.midX
         }
         notchView.baseNotchSize = notchSize
         notchView.hasRealNotch = hasRealNotch
@@ -165,14 +168,14 @@ final class NotchController {
             let left: CGFloat = agents.waiting ? 84 : (music ? wing : 0)
             let right: CGFloat = timer.isRunning ? 72 : (calendar.imminent != nil ? 70 : (music ? wing : 0))
             size = NSSize(width: notchSize.width + (hasRealNotch ? 12 : 0) + left + right, height: notchSize.height)
-        case .toast:     size = NSSize(width: max(notchSize.width + 240, 380), height: notchSize.height + 14)
+        case .toast:     size = NSSize(width: max(notchSize.width + 200, 420), height: notchSize.height + 42)
         case .timerDone: size = NSSize(width: max(notchSize.width + 260, 420), height: notchSize.height + 46)
-        case .hud:       size = NSSize(width: max(notchSize.width + 200, 360), height: notchSize.height + 10)
+        case .hud:       size = NSSize(width: max(notchSize.width + 160, 380), height: notchSize.height + 40)
         case .agentAsk:  size = NSSize(width: max(notchSize.width + 260, 540), height: notchSize.height + 92)
         case .shot:      size = NSSize(width: max(shotToastSize.width, notchSize.width + 200), height: notchSize.height + shotToastSize.height)
         case .expanded:  size = NSSize(width: expandedSize.width, height: expandedSize.height + (notchView.nowPlaying != nil ? musicExtra : 0))
         }
-        let x = screen.frame.midX - size.width / 2
+        let x = notchCenterX - size.width / 2
         let y = screen.frame.maxY - size.height
         return NSRect(x: x, y: y, width: size.width, height: size.height)
     }
@@ -200,7 +203,7 @@ final class NotchController {
         // immediately, morph the black shape with Core Animation, then shrink the window to the final size.
         let current = panel.frame
         let unionSize = NSSize(width: max(current.width, target.width), height: max(current.height, target.height))
-        let union = NSRect(x: screen.frame.midX - unionSize.width / 2, y: screen.frame.maxY - unionSize.height,
+        let union = NSRect(x: notchCenterX - unionSize.width / 2, y: screen.frame.maxY - unionSize.height,
                            width: unionSize.width, height: unionSize.height)
         let curShape = notchView.rect
         let dx = (unionSize.width - current.width) / 2
@@ -767,14 +770,15 @@ final class NotchView: NSView {
                 case .capsLock: sym = e.on ? "capslock.fill" : "capslock"
                 }
                 hudIcon.image = UI.symbol(sym, size: 14, weight: .semibold)
-                hudIcon.frame = NSRect(x: padX, y: (cb.height - 18) / 2, width: 18, height: 18)
+                let rowY = baseNotchSize.height + 11
+                hudIcon.frame = NSRect(x: padX, y: rowY, width: 18, height: 18)
                 if e.kind == .capsLock {
                     hudBar.isHidden = true
                     hudLabel.stringValue = e.on ? "Caps Lock on" : "Caps Lock off"; hudLabel.sizeToFit()
-                    hudLabel.frame.origin = NSPoint(x: padX + 26, y: (cb.height - hudLabel.frame.height) / 2)
+                    hudLabel.frame.origin = NSPoint(x: padX + 26, y: rowY + (18 - hudLabel.frame.height) / 2)
                 } else {
                     hudLabel.isHidden = true
-                    hudBar.frame = NSRect(x: padX + 28, y: (cb.height - 6) / 2, width: cb.width - padX * 2 - 28, height: 6)
+                    hudBar.frame = NSRect(x: padX + 28, y: rowY + 6, width: cb.width - padX * 2 - 28, height: 6)
                     hudFill.frame = NSRect(x: 0, y: 0, width: hudBar.frame.width * CGFloat(e.level), height: 6)
                 }
             }
@@ -817,7 +821,7 @@ final class NotchView: NSView {
             hintArt.isHidden = true; hintBars.isHidden = true; setMusicCardVisible(false)
             toastStack.isHidden = false
             let w = cb.width - padX * 2
-            toastStack.frame = NSRect(x: padX, y: (cb.height - 18) / 2, width: w, height: 18)
+            toastStack.frame = NSRect(x: padX, y: baseNotchSize.height + 11, width: w, height: 20)
             toastIcon.frame.size = NSSize(width: 18, height: 18)
         case .expanded:
             toastStack.isHidden = true
