@@ -58,8 +58,10 @@ Hover the notch and it unfolds into a Dynamic-Island-style surface. Tabs: **Home
 | **Weather** | Current conditions in the corner. Opt-in. |
 | **Prompter** | Scrolls your last copied text, for reading a script on camera. |
 
+<p align="center"><img src="docs/clips.jpg" width="820" alt="Clips tab: your last clips as chips, tap to paste"></p>
 <p align="center"><img src="docs/agents.jpg" width="820" alt="Agents tab with a Claude Code permission request"></p>
 <p align="center"><img src="docs/shelf.jpg" width="820" alt="Shelf tab holding a dropped file"></p>
+<p align="center"><img src="docs/prompter.jpg" width="820" alt="Prompter tab scrolling a script"></p>
 <p align="center"><img src="docs/focus.jpg" width="820" alt="Focus tab with a Pomodoro ready to start"></p>
 
 Accidental opens are prevented with hover intent (half a second by default, or click only). Drags open the island instantly.

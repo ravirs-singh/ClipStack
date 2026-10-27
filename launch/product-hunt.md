@@ -26,13 +26,12 @@ Free
 
 ## Gallery (1270×760, in `launch/gallery/`)
 1. The island — Home card
-2. Clipboard history
-3. Smart actions
-4. Screenshot + OCR
-5. Claude Code approval from the notch
-6. Shelf
-7. Focus / Pomodoro
-8. Outro card
+2. Clips tab: the clipboard in the notch
+3. Full history window with one-click actions
+4. Claude Code approval from the notch
+5. Shelf
+6. Prompter
+7. Screenshot + OCR
 
 Thumbnail: `launch/logo-240.png` (240×240). Hero video: YouTube link of the brag video.
 
