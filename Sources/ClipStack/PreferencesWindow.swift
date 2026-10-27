@@ -301,6 +301,7 @@ final class NotchPane: PreferencePane {
     private lazy var calCheck = checkbox("Show next calendar event and today's reminders", #selector(changed))
     private lazy var weatherCheck = checkbox("Show the weather (uses your location)", #selector(changed))
     private let glowPopup = NSPopUpButton()
+    private let hoverPopup = NSPopUpButton()
 
     override func build() {
         row("Notch:", enableCheck)
@@ -317,6 +318,10 @@ final class NotchPane: PreferencePane {
         for t in ["Off", "Subtle", "Vivid"] { glowPopup.addItem(withTitle: t) }
         glowPopup.target = self; glowPopup.action = #selector(glowChanged)
         row("Glow:", glowPopup)
+        for t in ["Instantly", "After ½ second", "After 1 second", "Only on click"] { hoverPopup.addItem(withTitle: t) }
+        hoverPopup.target = self; hoverPopup.action = #selector(hoverChanged)
+        row("Open on hover:", hoverPopup)
+        note("A short rest on the notch opens the island; brushing past it doesn't. Dragging files always opens it.")
         note("Tints the island's edge with the album art colour, orange when an agent needs you, amber while a timer runs.")
         note("Album art on the left of the notch, audio bars on the right; hover for controls. macOS will ask once to allow ClipStack to control each player.")
         note("For YouTube Music / YouTube in Chrome, Brave, Edge or Arc: enable View ▸ Developer ▸ “Allow JavaScript from Apple Events” in the browser once.")
@@ -333,6 +338,8 @@ final class NotchPane: PreferencePane {
         calCheck.state = Settings.calendarEnabled ? .on : .off
         weatherCheck.state = Settings.weatherEnabled ? .on : .off
         glowPopup.selectItem(at: Settings.notchGlow)
+        hoverPopup.selectItem(at: { switch Settings.notchHoverDelay { case nil: return 3; case .some(let d) where d <= 0: return 0; case .some(let d) where d < 0.8: return 1; default: return 2 } }())
+        hoverPopup.isEnabled = Settings.notchEnabled
         [calCheck, weatherCheck, glowPopup].forEach { $0.isEnabled = Settings.notchEnabled }
     }
 
@@ -347,6 +354,7 @@ final class NotchPane: PreferencePane {
         }
     }
     @objc private func glowChanged() { Settings.notchGlow = glowPopup.indexOfSelectedItem }
+    @objc private func hoverChanged() { Settings.notchHoverDelay = [0, 0.5, 1.0, nil][hoverPopup.indexOfSelectedItem] }
 }
 
 // MARK: - Agents

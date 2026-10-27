@@ -21,6 +21,7 @@ final class NotchController {
     private enum State { case collapsed, toast, shot, expanded, timerDone, agentAsk }
     private var state: State = .collapsed
     private var collapseTimer: Timer?
+    private var dwellTimer: Timer?
     private var hovering = false
     private var observers: [NSObjectProtocol] = []
 
@@ -46,6 +47,7 @@ final class NotchController {
 
         notchView = NotchView()
         notchView.onEnter = { [weak self] in self?.mouseEntered() }
+        notchView.onDragEnter = { [weak self] in self?.dragEntered() }
         notchView.onExit = { [weak self] in self?.mouseExited() }
         notchView.onClick = { [weak self] in self?.clicked() }
         notchView.onPick = { [weak self] item in self?.pick(item) }
@@ -241,11 +243,27 @@ final class NotchController {
         hovering = true
         collapseTimer?.invalidate()
         if agents.waiting && state != .expanded && state != .agentAsk { setState(.agentAsk, animated: true); return }
-        if state != .expanded && state != .shot && state != .timerDone && state != .agentAsk { expand() }
+        guard state == .collapsed || state == .toast else { return }
+        // Hover intent: only open once the cursor has rested on the notch, so passing by doesn't trigger it.
+        dwellTimer?.invalidate()
+        guard let delay = Settings.notchHoverDelay else { return }      // click-only mode
+        if delay <= 0 { expand(); return }
+        dwellTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self, self.hovering, self.state == .collapsed || self.state == .toast else { return }
+            self.expand()
+        }
+    }
+
+    /// A drag over the notch opens it right away — it's a drop target.
+    private func dragEntered() {
+        hovering = true
+        collapseTimer?.invalidate(); dwellTimer?.invalidate()
+        if state == .collapsed || state == .toast { expand() }
     }
 
     private func mouseExited() {
         hovering = false
+        dwellTimer?.invalidate()
         scheduleCollapse(after: 0.35)
     }
 
@@ -413,6 +431,7 @@ final class NotchView: NSView {
     var toastItem: ClipItem? { didSet { updateToast() } }
 
     var onEnter: (() -> Void)?
+    var onDragEnter: (() -> Void)?
     var onExit: (() -> Void)?
     var onClick: (() -> Void)?
     var onPick: ((ClipItem) -> Void)?
@@ -1106,7 +1125,7 @@ final class NotchView: NSView {
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         dragHighlight = true
-        onEnter?()
+        (onDragEnter ?? onEnter)?()
         return .copy
     }
     override func draggingExited(_ sender: NSDraggingInfo?) { dragHighlight = false; onExit?() }
