@@ -16,7 +16,7 @@ What ships under the `halvent` handle, and what would otherwise leak.
    git config user.email halvent@users.noreply.github.com
    ```
 3. Profile for `halvent`: no real name, no photo of you, no location, no personal links, no company field.
-4. Make the old `ravirs-singh/clipstack` repo private or delete it after the new one is up. Its history contains your name, and forks or search engines can surface it.
+4. Make your old personal ClipStack repo private or delete it once the new one is up. Its history carries your name, and forks or search engines can surface it.
 
 ## Code signing exposes your legal name
 A Developer ID certificate embeds the account holder's name. Anyone can run `codesign -dvv ClipStack.app` and read `Developer ID Application: <Your Name> (TEAMID)`. Options:
