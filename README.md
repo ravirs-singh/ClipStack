@@ -1,71 +1,111 @@
-# ClipStack — macOS clipboard manager
+<p align="center">
+  <img src="launch/logo-240.png" width="120" alt="ClipStack icon">
+</p>
+<h1 align="center">ClipStack</h1>
+<p align="center">
+  Clipboard history, screenshots with OCR, and a living notch for your Mac.<br>
+  Free, open source, pure AppKit. No accounts, no cloud, no telemetry.
+</p>
+<p align="center">
+  <a href="https://github.com/OWNER/ClipStack/releases/latest"><b>Download</b></a> ·
+  <a href="#install">Install</a> ·
+  <a href="#the-island">The island</a> ·
+  <a href="#build-from-source">Build</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-A lightweight menu-bar clipboard history app written in Swift (pure AppKit — builds with Command Line Tools alone, no Xcode needed). No dependencies.
+<p align="center"><img src="docs/hero-island.jpg" width="820" alt="The ClipStack island over the MacBook notch: Now Playing, agent status, weather, up next"></p>
 
-## Features
-- Records **text, rich text (RTF/HTML), images and Finder files** copied anywhere on the system
-- Menu-bar popover with search, keyboard navigation (↑ ↓ ⏎ Esc, ⌫ to delete)
-- **Preview pane** showing the full clip with character/word/line counts, image dimensions, formatted text
-- **Smart types** — detects URLs, emails, phone numbers, colors, JSON, numbers and code; shows a badge and offers actions:
-  open URL / compose email / call, pretty-print or minify JSON, hex ↔ rgb(), strip tracking params,
-  trim, collapse to one line, UPPER/lower/Title case, dedupe or sort lines
-- **⌘1–⌘9** to paste the Nth item instantly; **⇧⏎** to paste as plain text
-- Global hotkey (default **⌘⇧V**), changeable in Preferences
-- Pin items so they survive "Clear" and history trimming
-- Auto-paste into the app you were using (optional; needs Accessibility permission)
-- **Preferences window**: hotkey recorder, history size, polling rate, rich-text capture, auto-paste, launch at login
-- **Screenshot manager**: new screenshots are captured automatically, OCR'd on-device (searchable, "Copy text"), shown in the
-  notch with Copy / Text / Reveal / Trash, optionally moved into `~/Pictures/Screenshots/YYYY-MM/` and renamed by date + app.
-  Pasting a screenshot gives the file to Finder/Slack and the image to editors; drag chips out of the notch as files.
-- **Instant capture shortcuts** (⌃⇧3 / ⌃⇧4 / ⌃⇧5 by default, rebindable): ClipStack runs the capture itself, so the file
-  and history entry appear immediately — no floating-thumbnail delay. Also in the menu-bar right-click menu.
-- Filter bar: All / Text / Images / Screenshots / Files
-- **Now Playing in the notch**: album art on the left, animated audio bars on the right while Spotify / Apple Music / YouTube Music (Chrome, Brave, Edge, Arc — enable View ▸ Developer ▸ Allow JavaScript from Apple Events) plays;
-  hover for a player card with progress and prev / play / next.
-- **AI agent monitor**: Claude Code hooks report into ClipStack; the notch glows orange when an agent needs permission and
-  you Allow / Deny from the island (the agent waits). Sessions and their last action live in the Agents tab.
-- **Up Next**: next calendar events (with Join for Zoom/Meet/Teams) and today's reminders; the wing counts down 10 min before.
-- **Weather** in the island corner; a **Prompter** tab that scrolls your last copied text; configurable **glow** tinted by album art / agent state.
-- **Shelf & Timers in the notch**: drop files on the notch to keep them on a shelf and drag them out into any app later;
-  start a 5–60 min timer and watch the countdown ring in the notch wing, with a done banner (+5 min / Dismiss).
-- **Interactive notch** (Dynamic-Island style): sits over the MacBook notch, flashes what you just copied, expands on hover
-  to show your last 6 clips as tappable chips (tap = paste), click to open full history, and accepts drag-and-drop of
-  files/text/images straight into the clipboard. Macs without a notch get a small pill at the top of the screen.
-- Right-click the menu-bar icon for a quick menu; left-click opens history
-- De-duplicates repeated copies; skips passwords from password managers (`org.nspasteboard.ConcealedType`)
-- History persisted to `~/Library/Application Support/ClipStack/`
+## Install
 
-## Requirements
-macOS 13 Ventura or later, Xcode 15+ or Command Line Tools with Swift 5.9+.
+**One line** (downloads the latest signed build, or builds from source if there is no release yet):
 
-## Build & run
 ```bash
-chmod +x build-app.sh
-./build-app.sh      # builds, quits any running copy, launches the new one
+curl -fsSL https://raw.githubusercontent.com/OWNER/ClipStack/main/install.sh | bash
 ```
-For development: `swift run` (menu-bar icon appears; "Launch at login" is only available from the .app bundle).
+
+Or grab the DMG from [Releases](https://github.com/OWNER/ClipStack/releases/latest) and drag ClipStack to Applications.
+macOS 13 Ventura or later. Works on every Mac; the island needs a MacBook with a notch (other Macs get a small pill at the top of the screen).
+
+## What it does
+
+### Clipboard history
+Everything you copy is kept: text, rich text, images, files. Press **⌘⇧V** to search it. **⌘1–⌘9** pastes the Nth item anywhere, **⇧⏎** pastes as plain text. Pin what matters, and passwords from password managers are never recorded.
+
+<p align="center"><img src="docs/history.jpg" width="820" alt="History window with search, filters, and preview"></p>
+
+### Smart types, one-click actions
+ClipStack knows what you copied. JSON gets pretty-print and minify. URLs open, or lose their tracking params. Colors convert between hex and rgb(). Text gets trim, case changes, dedupe and sort lines.
+
+<p align="center"><img src="docs/smart-actions.jpg" width="820" alt="Action menu on a JSON clip"></p>
+
+### Screenshots, with the text inside them
+Capture with **⌃⇧3 / ⌃⇧4 / ⌃⇧5** and the shot lands in your history instantly, OCR'd on-device so you can search it and copy the text out. Optional monthly folders and date + app naming.
+
+<p align="center"><img src="docs/screenshot-ocr.jpg" width="820" alt="Screenshot toast in the notch with recognized text"></p>
+
+## The island
+
+Hover the notch and it unfolds into a Dynamic-Island-style surface. Tabs: **Home**, **Clips**, **Shelf**, **Agents**, **Up Next**, **Prompter**, **Focus**.
+
+| | |
+|---|---|
+| **Now Playing** | Spotify, Apple Music, and YouTube / YouTube Music in Chrome, Brave, Edge or Arc. Album art in the wing, controls in the card. |
+| **Agents** | Claude Code permission requests appear in the notch. **Allow** or **Deny** without switching windows. The notch glows orange while an agent waits. |
+| **Shelf** | Drop files on the notch. They wait there until you drag them out into any app. |
+| **Focus** | Pomodoro and timers, with a countdown ring in the notch wing. |
+| **Up Next** | Next calendar event with a Join button for Zoom / Meet / Teams, plus today's reminders. Opt-in. |
+| **Weather** | Current conditions in the corner. Opt-in. |
+| **Prompter** | Scrolls your last copied text, for reading a script on camera. |
+
+<p align="center"><img src="docs/agents.jpg" width="820" alt="Agents tab with a Claude Code permission request"></p>
+<p align="center"><img src="docs/shelf.jpg" width="820" alt="Shelf tab holding a dropped file"></p>
+<p align="center"><img src="docs/focus.jpg" width="820" alt="Focus tab with a Pomodoro ready to start"></p>
+
+Accidental opens are prevented with hover intent (half a second by default, or click only). Drags open the island instantly.
+
+## Claude Code integration
+
+Preferences → Agents → **Install Claude Code Hooks** adds a `PermissionRequest` hook to `~/.claude/settings.json`. The hook posts to a local server on `127.0.0.1:48766`, and your answer in the notch is returned to Claude Code. Nothing leaves your machine.
 
 ## Permissions
-- **Auto-paste** sends a synthetic ⌘V, which requires *System Settings → Privacy & Security → Accessibility → ClipStack*. The app prompts the first time; there's also a button in Preferences. Turn auto-paste off if you'd rather it only copy to the clipboard.
-- The global hotkey works without any permission.
+
+| Feature | Permission | Why |
+|---|---|---|
+| Auto-paste | Accessibility | Sends a synthetic ⌘V after you pick an item. Optional. |
+| Now Playing (browsers) | Automation, plus View ▸ Developer ▸ *Allow JavaScript from Apple Events* in the browser | Reads the page's media session. |
+| Up Next | Calendars, Reminders | Opt-in. |
+| Weather | Location | Opt-in. |
+
+The global hotkey and the clipboard history need no permissions.
+
+## Build from source
+
+Needs Command Line Tools with Swift 5.9 or newer. No Xcode, no dependencies.
+
+```bash
+git clone https://github.com/OWNER/ClipStack.git && cd ClipStack
+./build-app.sh        # builds dist/ClipStack.app, quits any running copy, launches the new one
+```
+
+Update later with `git pull && ./build-app.sh`. Maintainers: `./release.sh 1.0.0` signs, notarizes and packs the DMG (see the script header for the one-time setup).
+
+## Privacy
+
+History lives in `~/Library/Application Support/ClipStack/`. ClipStack makes no network requests except weather (Open-Meteo, only if you turn it on). There is no analytics, no account, and no update check.
 
 ## Layout
+
 | File | Purpose |
 |---|---|
-| `ClipItem.swift` | Model (text/rich/image/files, pinned, timestamp) |
-| `ClipStore.swift` | History, de-dup, trimming, JSON persistence |
-| `ClipboardMonitor.swift` | Polls `NSPasteboard.changeCount`; captures files, text+RTF/HTML, images |
-| `SmartType.swift` | Content-type detection and text transformations |
-| `Paster.swift` | Writes to pasteboard (rich/plain/override), simulates ⌘V |
-| `HotKey.swift` | Carbon global hotkey, re-registers on settings change |
-| `Settings.swift` | UserDefaults-backed settings, launch-at-login, key names |
-| `PreferencesWindow.swift` | Preferences window + hotkey recorder |
-| `HistoryView.swift` | Popover UI: list, preview pane, actions, quick-pick |
-| `ScreenshotWatcher.swift` | Spotlight watcher, organize/rename, Vision OCR |
-| `AgentMonitor.swift` | Local hook server for Claude Code, permission decisions, hook installer |
-| `CalendarMonitor.swift` | EventKit events/reminders, join-link detection |
-| `Weather.swift` | CoreLocation + Open-Meteo |
-| `Shelf.swift` | Shelf store, notch timer, ring view |
-| `NowPlaying.swift` | Spotify / Music polling via Apple Events, audio-bars view |
-| `NotchWindow.swift` | Notch panel: shape, toast, hover-expand chips, drag & drop |
-| `AppDelegate.swift` | Status item, popover, wiring |
+| `ClipStore.swift`, `ClipItem.swift`, `ClipboardMonitor.swift` | History model, persistence, pasteboard polling |
+| `SmartType.swift`, `Paster.swift` | Content detection, transforms, paste |
+| `HistoryView.swift`, `PreferencesWindow.swift` | History popover and preferences |
+| `NotchWindow.swift`, `IslandUI.swift` | The notch panel, shape morphing, island tabs |
+| `ScreenshotCapture.swift`, `ScreenshotWatcher.swift` | Capture shortcuts, folder watcher, Vision OCR |
+| `AgentMonitor.swift` | Local hook server for Claude Code |
+| `NowPlaying.swift`, `CalendarMonitor.swift`, `Weather.swift`, `Shelf.swift` | Island data sources |
+
+## License
+
+[MIT](LICENSE)

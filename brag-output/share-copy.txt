@@ -1,3 +1,0 @@
-Your Mac's notch, finally useful: what's playing, your Claude Code agent asking for permission (approve from the notch), a shelf for files, a Pomodoro — and a 200-item clipboard with instant screenshots + OCR behind it. ClipStack, free and open source for macOS.
-
-github.com/ravirs-singh/ClipStack
