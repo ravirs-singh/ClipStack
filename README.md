@@ -7,7 +7,7 @@
   Free, open source, pure AppKit. No accounts, no cloud, no telemetry.
 </p>
 <p align="center">
-  <a href="https://github.com/OWNER/ClipStack/releases/latest"><b>Download</b></a> ·
+  <a href="https://github.com/halvent/clipstack/releases/latest"><b>Download</b></a> ·
   <a href="#install">Install</a> ·
   <a href="#the-island">The island</a> ·
   <a href="#build-from-source">Build</a> ·
@@ -21,10 +21,10 @@
 **One line** (downloads the latest signed build, or builds from source if there is no release yet):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/ClipStack/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/halvent/clipstack/main/install.sh | bash
 ```
 
-Or grab the DMG from [Releases](https://github.com/OWNER/ClipStack/releases/latest) and drag ClipStack to Applications.
+Or grab the DMG from [Releases](https://github.com/halvent/clipstack/releases/latest) and drag ClipStack to Applications.
 macOS 13 Ventura or later. Works on every Mac; the island needs a MacBook with a notch (other Macs get a small pill at the top of the screen).
 
 ## What it does
@@ -86,7 +86,7 @@ The global hotkey and the clipboard history need no permissions.
 Needs Command Line Tools with Swift 5.9 or newer. No Xcode, no dependencies.
 
 ```bash
-git clone https://github.com/OWNER/ClipStack.git && cd ClipStack
+git clone https://github.com/halvent/clipstack.git && cd ClipStack
 ./build-app.sh        # builds dist/ClipStack.app, quits any running copy, launches the new one
 ```
 

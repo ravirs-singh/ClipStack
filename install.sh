@@ -1,9 +1,9 @@
 #!/bin/bash
 # One-click install for ClipStack.
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/ClipStack/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/halvent/clipstack/main/install.sh | bash
 # Prefers the latest signed DMG from GitHub Releases; falls back to building from source (needs Command Line Tools).
 set -euo pipefail
-REPO="${CLIPSTACK_REPO:-OWNER/ClipStack}"
+REPO="${CLIPSTACK_REPO:-halvent/clipstack}"
 APP="/Applications/ClipStack.app"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
@@ -11,17 +11,21 @@ say() { printf '\033[1;34m▸\033[0m %s\n' "$*"; }
 
 [ "$(uname)" = "Darwin" ] || { echo "ClipStack is a macOS app."; exit 1; }
 
-dmg_url="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
-  | grep -o '"browser_download_url": *"[^"]*\.dmg"' | head -1 | sed 's/.*"\(http[^"]*\)"/\1/' || true)"
+asset_url="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+  | grep -o '"browser_download_url": *"[^"]*\.\(dmg\|zip\)"' | head -1 | sed 's/.*"\(http[^"]*\)"/\1/' || true)"
 
-if [ -n "$dmg_url" ]; then
-  say "Downloading $(basename "$dmg_url")"
-  curl -fL --progress-bar "$dmg_url" -o "$TMP/ClipStack.dmg"
+if [ -n "$asset_url" ]; then
+  say "Downloading $(basename "$asset_url")"
+  curl -fL --progress-bar "$asset_url" -o "$TMP/asset"
   say "Installing to /Applications"
-  mnt="$(hdiutil attach "$TMP/ClipStack.dmg" -nobrowse -quiet | grep -o '/Volumes/.*' | head -1)"
   pgrep -xq ClipStack && killall ClipStack && sleep 0.5 || true
-  rm -rf "$APP"; cp -R "$mnt/ClipStack.app" "$APP"
-  hdiutil detach "$mnt" -quiet
+  rm -rf "$APP"
+  case "$asset_url" in
+    *.dmg) mnt="$(hdiutil attach "$TMP/asset" -nobrowse -quiet | grep -o '/Volumes/.*' | head -1)"; cp -R "$mnt/ClipStack.app" "$APP"; hdiutil detach "$mnt" -quiet ;;
+    *.zip) ditto -x -k "$TMP/asset" "$TMP/unzipped"; cp -R "$(find "$TMP/unzipped" -maxdepth 2 -name ClipStack.app | head -1)" "$APP" ;;
+  esac
+  # Unsigned builds carry the quarantine flag; clear it so Gatekeeper doesn't refuse to open the app.
+  xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 else
   say "No release DMG found for $REPO — building from source"
   xcode-select -p >/dev/null 2>&1 || { say "Installing Command Line Tools (a dialog will open; re-run after it finishes)"; xcode-select --install; exit 1; }

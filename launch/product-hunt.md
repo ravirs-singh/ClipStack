@@ -17,8 +17,8 @@ ClipStack keeps everything you copy, OCRs every screenshot, and turns the MacBoo
 Mac, Productivity, Open Source, Developer Tools, Design Tools
 
 ## Links
-- Website / GitHub: https://github.com/OWNER/ClipStack
-- Download: https://github.com/OWNER/ClipStack/releases/latest
+- Website / GitHub: https://github.com/halvent/clipstack
+- Download: https://github.com/halvent/clipstack/releases/latest
 - Video: brag-output/brag.mp4 (upload to YouTube and paste the link; PH embeds YouTube)
 
 ## Pricing
@@ -47,13 +47,13 @@ I built ClipStack because three things annoyed me every day on my MacBook:
 It's free and MIT-licensed, pure AppKit, builds with just the Command Line Tools, and never talks to a server (the only network request is weather, and only if you turn it on).
 
 One-line install:
-`curl -fsSL https://raw.githubusercontent.com/OWNER/ClipStack/main/install.sh | bash`
+`curl -fsSL https://raw.githubusercontent.com/halvent/clipstack/main/install.sh | bash`
 
 Would love to hear what you'd put in the notch next.
 
 ## Launch checklist
-- [ ] Create the new public GitHub repo and push (replace `OWNER` everywhere: `grep -rl OWNER --exclude-dir=.git . | xargs sed -i '' 's#OWNER#your-handle#g'`)
-- [ ] Apple Developer ID: run `./release.sh 1.0.0`, upload the DMG as a GitHub Release `v1.0.0` (unsigned builds trigger Gatekeeper warnings and hurt conversion)
+- [ ] Push the `launch` branch to `halvent/clipstack` as `main` (see privacy-checklist.md first)
+- [ ] Decide on signing (see privacy-checklist.md: a personal Developer ID exposes your legal name). Unsigned: build with `./build-app.sh`, zip `dist/ClipStack.app`, upload as Release `v1.0.0`. Signed under a company: `./release.sh 1.0.0`.
 - [ ] Put `sha256` from release.sh into `Casks/clipstack.rb`; push it to a `homebrew-clipstack` tap repo
 - [ ] Upload brag.mp4 to YouTube (unlisted is fine), use the vertical cut for X / Instagram / TikTok teasers
 - [ ] Add 3–5 real screenshots from your own Mac to the gallery alongside the rendered ones

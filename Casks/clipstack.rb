@@ -1,13 +1,13 @@
-# Homebrew cask. After the first release: `brew install --cask OWNER/clipstack/clipstack`
+# Homebrew cask. After the first release: `brew install --cask halvent/clipstack/clipstack`
 # (host this file in a tap repo named `homebrew-clipstack`, or submit to homebrew/cask once there are enough stars).
 cask "clipstack" do
   version "1.0.0"
   sha256 "REPLACE_WITH_SHASUM_FROM_release.sh"
 
-  url "https://github.com/OWNER/ClipStack/releases/download/v#{version}/ClipStack-#{version}.dmg"
+  url "https://github.com/halvent/clipstack/releases/download/v#{version}/ClipStack-#{version}.dmg"
   name "ClipStack"
   desc "Clipboard history, screenshots with OCR, and a Dynamic-Island-style notch for macOS"
-  homepage "https://github.com/OWNER/ClipStack"
+  homepage "https://github.com/halvent/clipstack"
 
   depends_on macos: ">= :ventura"
 
@@ -15,6 +15,6 @@ cask "clipstack" do
 
   zap trash: [
     "~/Library/Application Support/ClipStack",
-    "~/Library/Preferences/com.brainsick.clipstack.plist",
+    "~/Library/Preferences/com.halvent.clipstack.plist",
   ]
 end
