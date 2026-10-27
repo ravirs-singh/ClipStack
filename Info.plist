@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>            <string>ClipStack</string>
+    <key>CFBundleDisplayName</key>     <string>ClipStack</string>
+    <key>CFBundleIdentifier</key>      <string>com.halvent.clipstack</string>
+    <key>CFBundleVersion</key>         <string>1</string>
+    <key>CFBundleShortVersionString</key> <string>1.0</string>
+    <key>CFBundlePackageType</key>     <string>APPL</string>
+    <key>CFBundleExecutable</key>      <string>ClipStack</string>
+    <key>LSMinimumSystemVersion</key>  <string>13.0</string>
+    <key>CFBundleIconFile</key>        <string>AppIcon</string>
+    <key>NSAppleEventsUsageDescription</key> <string>ClipStack shows what's playing in Spotify or Music in the notch.</string>
+    <key>NSCalendarsUsageDescription</key> <string>ClipStack shows your next event in the notch.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key> <string>ClipStack shows your next event in the notch.</string>
+    <key>NSRemindersUsageDescription</key> <string>ClipStack lists today's reminders in the notch.</string>
+    <key>NSRemindersFullAccessUsageDescription</key> <string>ClipStack lists today's reminders in the notch.</string>
+    <key>NSLocationWhenInUseUsageDescription</key> <string>ClipStack uses your location for the weather in the notch.</string>
+    <key>NSLocationUsageDescription</key> <string>ClipStack uses your location for the weather in the notch.</string>
+    <key>LSUIElement</key>             <true/>
+    <key>NSHighResolutionCapable</key> <true/>
+</dict>
+</plist>

@@ -1,0 +1,24 @@
+// swift-tools-version:5.9
+import PackageDescription
+
+let package = Package(
+    name: "ClipStack",
+    platforms: [.macOS(.v13)],
+    targets: [
+        .executableTarget(
+            name: "ClipStack",
+            path: "Sources/ClipStack",
+            linkerSettings: [
+                .linkedFramework("Carbon"),
+                .linkedFramework("AppKit"),
+                .linkedFramework("Vision"),
+                .linkedFramework("ServiceManagement"),
+                .linkedFramework("EventKit"),
+                .linkedFramework("CoreLocation"),
+                .linkedFramework("CoreAudio"),
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("Network"),
+            ]
+        )
+    ]
+)
