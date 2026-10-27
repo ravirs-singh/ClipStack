@@ -44,6 +44,7 @@ final class GlassCard: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+    override func setFrameSize(_ s: NSSize) { super.setFrameSize(s); needsLayout = true }
     override func layout() { super.layout(); CATransaction.begin(); CATransaction.setDisableActions(true); grad.frame = bounds; CATransaction.commit() }
 
     private func update() {
@@ -127,6 +128,7 @@ final class TabCapsule: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func setFrameSize(_ s: NSSize) { super.setFrameSize(s); needsLayout = true }
 
     private func rebuild() {
         buttons.forEach { $0.removeFromSuperview() }; countLabels.forEach { $0.removeFromSuperview() }
@@ -206,9 +208,11 @@ final class ListRow: NSView {
     required init?(coder: NSCoder) { fatalError() }
     private var titleField: NSTextField!, subField: NSTextField!, tagField: NSTextField?, accessory: NSView?, separator: NSView!
     var showsSeparator = true { didSet { separator.isHidden = !showsSeparator } }
+    override func setFrameSize(_ s: NSSize) { super.setFrameSize(s); needsLayout = true }
 
     override func layout() {
         super.layout()
+        guard bounds.width > 60 else { return }
         var right = bounds.width - 16
         if let a = accessory { a.frame.origin = NSPoint(x: right - a.frame.width, y: (bounds.height - a.frame.height) / 2); right -= a.frame.width + 12 }
         if let g = tagField { g.frame.origin = NSPoint(x: right - g.frame.width, y: 10); right -= g.frame.width + 12 }
@@ -263,6 +267,7 @@ final class IslandContentView: NSView {
 
     override var isFlipped: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func setFrameSize(_ s: NSSize) { super.setFrameSize(s); needsLayout = true }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -326,7 +331,7 @@ final class IslandContentView: NSView {
     }
 
     private var pendingLayout: [() -> Void] = []
-    private func layoutCardContents() { pendingLayout.forEach { $0() } }
+    private func layoutCardContents() { (homeCards + [left, right]).forEach { $0.layoutSubtreeIfNeeded() }; pendingLayout.forEach { $0() } }
     private func onLayout(_ f: @escaping () -> Void) { pendingLayout.append(f) }
 
     // Summary card helper: small label top-left, big numeral bottom-left, optional circle button top-right.

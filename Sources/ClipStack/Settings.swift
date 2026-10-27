@@ -60,6 +60,11 @@ enum Settings {
         get { d.object(forKey: "weatherEnabled") as? Bool ?? false }
         set { d.set(newValue, forKey: "weatherEnabled"); notify() }
     }
+    /// Seconds the cursor must rest on the notch before the island opens; nil = click only.
+    static var notchHoverDelay: Double? {
+        get { let v = d.object(forKey: "notchHoverDelay") as? Double ?? 0.5; return v < 0 ? nil : v }
+        set { d.set(newValue ?? -1, forKey: "notchHoverDelay"); notify() }
+    }
     static var agentsEnabled: Bool {
         get { d.object(forKey: "agentsEnabled") as? Bool ?? true }
         set { d.set(newValue, forKey: "agentsEnabled"); notify() }
