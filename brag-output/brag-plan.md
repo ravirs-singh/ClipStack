@@ -1,38 +1,35 @@
-# ClipStack — brag plan
+# ClipStack — brag plan (v2, the island)
 
-**What is it:** ClipStack is a free, open-source macOS clipboard manager that also turns the MacBook notch into a living Dynamic-Island-style surface and auto-manages screenshots.
+**What is it:** ClipStack is a free, open-source macOS app that turns the MacBook notch into a Dynamic-Island-style command surface — clipboard history, AI-agent approvals, a file shelf, Pomodoro, Now Playing, calendar — and a full clipboard manager with instant screenshots + OCR behind it.
 
-**Who / what for:** Mac users who copy a lot (devs, designers, ops people). Never lose a copied thing again; paste anything from the last 200 with ⌘1–9; screenshots arrive instantly with their text recognized.
+**Who / what for:** People who build with Claude Code and copy a lot. One hover shows what's playing, what the agent is doing, what's next; one click approves an agent command; files and clips live a hover away.
 
-**What sets it apart:** The notch. Album art + audio bars while music plays (Spotify, Apple Music, YouTube Music in Chrome), hover for recent clips and player controls, drop files on it. Plus on-device OCR for screenshots and smart types (URL/JSON/color/code) with one-click actions.
+**What sets it apart:** the notch is the UI. Agent permission requests land in the notch and you answer from there. Clipboard history is deep (200 items, smart types, ⌘1–9). Free and open source.
 
-**Most impressive claim:** "Your notch, alive." — a part of the screen Apple left blank now shows what's playing and what you copied.
+**Most impressive claim:** "Claude Code asks for permission. You approve from the notch."
 
-**Visual hook:** the black notch growing wings with album art and bouncing audio bars.
+**Visual hook:** the black notch growing wings (album art + audio bars), then unfolding into the island with four glass cards.
 
-**Real UI shown:** the History window (sidebar list with tinted icon tiles, capsule badges, preview card), the notch island (player card + RECENT chips), the screenshot drop-down (Copy · Text · Reveal · Trash). The app is native AppKit, so these are rebuilt in HTML/CSS from the app's own layout, colors and type rules (SF-style sizes, system tint colors, continuous corners). The real app icon (`Assets/icon-1024.png`) is used as-is.
+**Real UI shown:** the island exactly as built — tab capsule (icon tabs, selected one expands into a labelled pill), Home cards (Now Playing with circle controls, Claude card with state dot and big session count, Weather, Up next with big time), the Agents permission card with Allow/Deny pills, the Clips two-card layout with chips, the Shelf, the Focus tab (big 25:00, Pomodoro/Timer pills, "Would end at", progress line, session dots), and the collapsed notch wings (art + bars, timer ring + countdown). Rebuilt in HTML/CSS from the AppKit layout code (same sizes, radii, colours). Real app icon used.
 
-**Tone:** `default` — punchy, playful, clean, with an Apple-keynote restraint. Dark stage, big Inter Display type, the icon's blue→indigo as the only accent.
+**Tone:** `default` — punchy, clean, keynote-ish. Dark stage; the island does the talking.
 
-**Share caption:** "Your Mac remembers one thing you copied. ClipStack remembers 200 — and puts your music in the notch."
+**Share caption:** "Your Mac's notch, finally useful: music, your Claude Code agent asking for permission, a shelf for files, a Pomodoro — and a 200-item clipboard behind it. ClipStack, free and open source."
 
-**Format:** landscape 1920×1080 (`brag.mp4`) and a vertical 1080×1920 Reels/Shorts cut (`brag-vertical.mp4`), 30 fps, 25 s. No fictional data: all clip text is real-looking developer/ops snippets with no personal data; the song shown is a placeholder title.
+**Format:** 1920×1080 + 1080×1920 vertical, 30 fps, 25 s. No real personal data; song, city, event and agent command are placeholders.
 
 ## Storyboard (25.0 s)
 
-| # | Time | Scene | On screen | Motion / sound |
+| # | Time | Scene | On screen | Sound |
 |---|---|---|---|---|
-| 1 | 0.0–3.3 | Hook | "You copy a couple hundred things a day." then "Your Mac remembers one." | Word-by-word rise; pad swell; tick on line 2 |
-| 2 | 3.3–6.5 | Reveal | App icon springs in, "ClipStack", tagline | Icon spring + glow; bass note + sparkle |
-| 3a | 6.5–10.0 | Hotkey → history | ⌘ ⇧ V key caps press; History window rises; six rows pop in (code, invoice text, URL, screenshot, JSON, files). Caption: "Everything you copy, kept. Text, links, images, files." | Key click; staggered ticks |
-| 3b | 10.0–12.9 | Search + paste | "invoice" typed → list filters to 2; ⌘1 key cap pulses, row highlights. Caption: "Search it. ⌘1–⌘9 pastes it anywhere." | Key clicks; blip on ⌘1 |
-| 3c | 12.9–16.0 | Smart actions | JSON row selected, "JSON" badge; Actions menu opens (Pretty-print, Minify, Trim, …); Pretty-print highlighted → preview reformats. Caption: "It knows what it copied. One-click actions." | Menu ticks; chime on reformat |
-| 4 | 16.0–20.2 | Notch | Notch grows wings (album art + audio bars); cursor hovers; island expands with player card + RECENT chips. Captions: "Your notch, alive." → "Now Playing · recent clips · drop files on it." | Whooshes synced to beat |
-| 5 | 20.2–23.0 | Screenshot | Crosshair selection; shutter; thumbnail flies into the island with Copy · Text · Reveal · Trash; recognized-text card. Caption: "Screenshots land instantly — text included." | Shutter + chime |
-| 6 | 23.0–25.0 | Outro | Icon + "ClipStack" + "Free & open source" + GitHub URL + ⌘⇧V | Music resolves and fades |
-
-Transitions dip through the dark background — no crossfading busy layouts. The vertical cut stacks the History window's list above its preview and zooms the Mac scenes around the notch.
+| 1 | 0.0–3.0 | Hook | "Your notch has been doing nothing." → "Until now." | pad swell, tick |
+| 2 | 3.0–5.6 | Reveal | Icon springs in · "ClipStack" · "Clipboard, screenshots and a living notch. Free, open source." | boom + sparkle |
+| 3a | 5.6–10.5 | Island · Home | Mac top; notch grows wings (art + bars); cursor rests; island unfolds to Home: Now Playing, Claude (Running · 2), Weather (23°), Up next (16:00 Product review). Caption: "Hover the notch. Everything that matters, at a glance." | whoosh, chips ticks |
+| 3b | 10.5–14.3 | Agents | Tab slides to Agents; orange card "clipstack wants to run Bash · npm run build" with Allow / Deny; cursor clicks Allow → card becomes "clipstack · Working". Caption: "Claude Code asks for permission. Approve from the notch." | tick, click, chime |
+| 3c | 14.3–16.3 | Clips | Tab → Clips: "200 items kept · 39 copied today" + six chips. Caption: "Your clipboard, searchable. ⌘1–9 pastes." | ticks |
+| 3d | 16.3–18.3 | Shelf | Tab → Shelf; a file flies onto the island; count 0→1, chip appears. Caption: "Drop files on the notch. Drag them out anywhere." | whoosh, pop |
+| 3e | 18.3–21.4 | Focus | Tab → Focus: 25:00, Pomodoro pill, "Would end at", line + session dots; click play → island collapses; notch shows ring + 24:59 next to the album art. Caption: "Pomodoro, right in the notch." | click, morph whoosh |
+| 4 | 21.6–25.0 | Outro | Icon + ClipStack · "Clipboard history · Screenshots + OCR · Agents · Shelf · Focus · Now Playing" · github.com/ravirs-singh/ClipStack · Free & open source | resolve, fade |
 
 ## Sound
-
-One synthesized piece in A minor, 112 BPM: pad chords looping Am–F–C–G, a plucked arpeggio from the reveal, soft kick + hat from the hotkey beat, ducked under. Effects are in key and in the same reverb: key clicks, ticks on pops, whooshes on the island, shutter + chime for the screenshot. Effects ~10 dB under the music, gentle lowpass, 1.4 s fade.
+Same synthesized A-minor piece at 112 BPM as v1, re-timed: pad chords, plucked arpeggio from the reveal, soft kick + hat from the island scene, effects in key (ticks for tab/chip pops, whoosh for the island morph, click for Allow, bell for approval and timer start). 1.4 s fade.
